@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Genetic Drift — The Invariant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+  <style>
+    :root {
+      --bg: #F0F2F5;
+      --navy: #1C2B4A;
+      --blue: #4A6FA5;
+      --blue-light: #6B8FC4;
+      --blue-pale: #DCE8F5;
+      --text-muted: #6B7A96;
+      --border: #D4DCEA;
+      --red: #C94040;
+      --shell-blue: #4A6FA5;
+      --sea: #00D4FF;
+      --sea-deep: #00B8E0;
+      --sand: #FFE84D;
+      --sand-stroke: #F0C800;
+      --sand-inner: #FFF5A0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .wrapper {
+      width: 100%;
+      max-width: 820px;
+    }
+
+    /* ── CONTROLS ── */
+    .controls {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .control-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.5rem 1rem;
+      border: 1px solid var(--border);
+      background: white;
+      color: var(--navy);
+      border-radius: 3px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .btn:hover {
+      border-color: var(--blue);
+      color: var(--blue);
+    }
+
+    .btn.active {
+      background: var(--navy);
+      border-color: var(--navy);
+      color: white;
+    }
+
+    .btn-play {
+      background: var(--navy);
+      border-color: var(--navy);
+      color: white;
+      min-width: 80px;
+      animation: pulse 1.8s ease 0.6s 2;
+    }
+
+    .btn-play:hover {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: white;
+    }
+
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(28,43,74,0.5); }
+      60%  { box-shadow: 0 0 0 7px rgba(28,43,74,0); }
+      100% { box-shadow: 0 0 0 0 rgba(28,43,74,0); }
+    }
+
+    .btn-speed.turbo {
+      background: var(--blue-pale);
+      border-color: var(--blue);
+      color: var(--blue);
+    }
+
+    /* ── SVG ── */
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 16px;
+    }
+
+    /* ── BACK LINK ── */
+    .back {
+      margin-top: 1.5rem;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: color 0.2s;
+    }
+
+    .back:hover { color: var(--blue); }
+  </style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="control-group">
+      <span class="control-label">Population size</span>
+      <div class="btn-group">
+        <button class="btn active" id="btn-small">Small</button>
+        <button class="btn" id="btn-medium">Medium</button>
+        <button class="btn" id="btn-large">Large</button>
+      </div>
+    </div>
+    <div class="btn-group" style="align-self:flex-end">
+      <button class="btn btn-play" id="btn-play">▶ Play</button>
+      <button class="btn btn-speed" id="btn-speed">⚡ Faster</button>
+    </div>
+  </div>
+
+  <!-- SVG container -->
+  <div id="svg-container"></div>
+
+  <a href="../../index.html" class="back">← The Invariant</a>
+</div>
+
+<script>
+(function() {
+
+  // ── PALETTE ──
+  const RED      = "#E03030";
+  const BLUE     = "#4A6FA5";
+  const SAND     = "#FFE84D";
+  const SAND_IN  = "#FFFAAA";
+  const SAND_STR = "#F0C800";
+  const NEON_GRN = "#39FF14";
+  const SEA      = "#00D4FF";
+  const DARK     = "#1C2B4A";
+  const MUTED    = "#6B7A96";
+  const LIGHT    = "#D4DCEA";
+
+  const W = 760, H = 560;
+
+  // ── FREEFORM ISLAND PATH (traced from sketch) ──
+  // Centered around 360, 290 — wider than tall, organic shape with indent on left
+  const ISLAND_PATH = `
+    M 155,270
+    C 148,240 160,210 185,200
+    C 205,192 220,198 235,195
+    C 250,192 258,182 272,178
+    C 295,172 320,175 345,170
+    C 375,165 405,168 430,172
+    C 460,177 488,185 510,195
+    C 535,207 548,225 555,248
+    C 562,268 558,292 548,312
+    C 538,332 520,348 498,358
+    C 474,370 445,372 418,375
+    C 388,378 355,376 325,370
+    C 295,364 268,352 248,338
+    C 225,322 205,302 185,290
+    C 170,282 158,278 155,270
+    Z
+  `;
+
+  // Bounding box approx for point-in-polygon
+  // We'll use a canvas-based hit test
+  let islandCanvas, islandCtx;
+
+  function buildIslandCanvas() {
+    islandCanvas = document.createElement("canvas");
+    islandCanvas.width = W;
+    islandCanvas.height = H;
+    islandCtx = islandCanvas.getContext("2d");
+    const p = new Path2D(ISLAND_PATH);
+    islandCtx.fill(p);
+  }
+
+  function insideIsland(x, y) {
+    const p = new Path2D(ISLAND_PATH);
+    return islandCtx.isPointInPath(p, x, y);
+  }
+
+  let N = 30;
+  let generation = 0;
+  let shells = [];
+  let positions = [];
+  let timer = null;
+  let wiggleTimer = null;
+  let playing = false;
+  let speed = 380;
+  let turbo = false;
+
+  // ── HELPERS ──
+  function binomial(n, p) {
+    let x = 0;
+    for (let i = 0; i < n; i++) if (Math.random() < p) x++;
+    return x;
+  }
+
+  function makePopulation(n, p) {
+    const redCount = binomial(n, p);
+    const s = d3.range(n).map(i => ({ id: i, color: i < redCount ? "red" : "blue" }));
+    return d3.shuffle(s);
+  }
+
+  function makePositions(n) {
+    const pts = [];
+    const minDist = n <= 40 ? 26 : n <= 90 ? 22 : 18;
+    let attempts = 0;
+    // bounding box of island
+    const bx0 = 145, bx1 = 565, by0 = 160, by1 = 385;
+    while (pts.length < n && attempts < 60000) {
+      attempts++;
+      const x = bx0 + Math.random() * (bx1 - bx0);
+      const y = by0 + Math.random() * (by1 - by0);
+      if (!insideIsland(x, y)) continue;
+      let ok = true;
+      for (const p of pts) {
+        const dx = p.x - x, dy = p.y - y;
+        if (dx*dx + dy*dy < minDist*minDist) { ok = false; break; }
+      }
+      if (ok) pts.push({x, y});
+    }
+    return pts;
+  }
+
+  // ── SVG SETUP ──
+  buildIslandCanvas();
+
+  const svg = d3.select("#svg-container")
+    .append("svg")
+    .attr("viewBox", [0, 0, W, H])
+    .style("background", SEA)
+    .style("border-radius", "16px");
+
+  const defs = svg.append("defs");
+
+  // Drop shadow
+  const filt = defs.append("filter").attr("id","shadow")
+    .attr("x","-20%").attr("y","-20%").attr("width","140%").attr("height","140%");
+  filt.append("feDropShadow").attr("dx",0).attr("dy",5)
+    .attr("stdDeviation",10).attr("flood-color","rgba(0,100,180,0.25)").attr("flood-opacity",1);
+
+  // Island gradient
+  const grad = defs.append("radialGradient").attr("id","islandGrad")
+    .attr("cx","40%").attr("cy","40%").attr("r","60%");
+  grad.append("stop").attr("offset","0%").attr("stop-color", SAND_IN);
+  grad.append("stop").attr("offset","100%").attr("stop-color", SAND);
+
+  // Sea wave pattern
+  const pat = defs.append("pattern").attr("id","seaPat")
+    .attr("width",80).attr("height",80).attr("patternUnits","userSpaceOnUse");
+  pat.append("rect").attr("width",80).attr("height",80).attr("fill", SEA);
+  pat.append("path").attr("d","M 0 20 Q 20 12 40 20 Q 60 28 80 20")
+    .attr("fill","none").attr("stroke","rgba(255,255,255,0.4)").attr("stroke-width",1.5);
+  pat.append("path").attr("d","M 0 50 Q 20 42 40 50 Q 60 58 80 50")
+    .attr("fill","none").attr("stroke","rgba(255,255,255,0.25)").attr("stroke-width",1);
+
+  // Background
+  svg.append("rect").attr("width",W).attr("height",H).attr("fill","url(#seaPat)");
+
+  // Freeform island
+  svg.append("path")
+    .attr("d", ISLAND_PATH)
+    .attr("fill","url(#islandGrad)")
+    .attr("stroke", SAND_STR)
+    .attr("stroke-width", 4)
+    .attr("filter","url(#shadow)");
+
+
+
+  // Title panel background — frosted white behind text
+  svg.append("rect")
+    .attr("x", 160).attr("y", 10)
+    .attr("width", 440).attr("height", 100)
+    .attr("rx", 10)
+    .attr("fill", "rgba(255,255,255,0.72)")
+    .attr("stroke", "rgba(255,255,255,0.9)")
+    .attr("stroke-width", 1);
+
+  // Title
+  svg.append("text").attr("x",380).attr("y",38).attr("text-anchor","middle")
+    .attr("fill",DARK).style("font-family","'DM Serif Display', serif")
+    .style("font-size","19px").style("font-weight","400")
+    .text("A Small Island, Two Colors, No Winner");
+
+  // Subtitle
+  svg.append("text").attr("x",380).attr("y",58).attr("text-anchor","middle")
+    .attr("fill",MUTED).style("font-family","'DM Sans', sans-serif")
+    .style("font-size","11px").style("font-weight","300")
+    .style("font-style","italic")
+    .text("Watch what pure randomness does over time.");
+
+  // Generation counter
+  const genText = svg.append("text").attr("x",380).attr("y",80)
+    .attr("text-anchor","middle").attr("fill",DARK)
+    .style("font-family","'DM Mono', monospace")
+    .style("font-size","11px").style("font-weight","500")
+    .style("letter-spacing","0.1em");
+
+  const fixedText = svg.append("text").attr("x",380).attr("y",98)
+    .attr("text-anchor","middle")
+    .style("font-family","'DM Mono', monospace")
+    .style("font-size","11px").style("font-weight","500");
+
+  // Progress bar
+  const barX = 160, barY = 488, barW = 440, barH = 13;
+  svg.append("rect").attr("x",barX).attr("y",barY)
+    .attr("width",barW).attr("height",barH).attr("rx",6).attr("fill",LIGHT);
+  const barFill = svg.append("rect").attr("x",barX).attr("y",barY)
+    .attr("height",barH).attr("rx",6).attr("fill",RED);
+  const redLabel = svg.append("text").attr("x",barX).attr("y",barY-7)
+    .attr("fill",RED).style("font-family","'DM Mono', monospace").style("font-size","11px").style("font-weight","500");
+  const blueLabel = svg.append("text").attr("x",barX+barW).attr("y",barY-7)
+    .attr("text-anchor","end").attr("fill",BLUE)
+    .style("font-family","'DM Mono', monospace").style("font-size","11px").style("font-weight","500");
+
+  const shellLayer = svg.append("g");
+
+  // ── SPIRAL SHELL DRAWING ──
+  function drawShell(group, r, color) {
+    // Outer shell body — slightly oval
+    group.append("ellipse")
+      .attr("rx", r).attr("ry", r * 0.85)
+      .attr("fill", color)
+      .attr("stroke","rgba(15,23,42,0.25)").attr("stroke-width", 0.8);
+
+    // Spiral — 1.5 turns inward
+    const spiralPts = [];
+    for (let a = 0; a <= Math.PI * 3; a += 0.15) {
+      const sr = r * 0.85 * (1 - a / (Math.PI * 4));
+      spiralPts.push([sr * Math.cos(a), sr * Math.sin(a) * 0.75]);
+    }
+    const line = d3.line()(spiralPts);
+    group.append("path")
+      .attr("d", line)
+      .attr("fill","none")
+      .attr("stroke","rgba(255,255,255,0.5)")
+      .attr("stroke-width", Math.max(0.6, r * 0.1))
+      .attr("stroke-linecap","round");
+
+    // Center dot
+    group.append("circle").attr("r", r * 0.12)
+      .attr("fill","rgba(255,255,255,0.6)");
+  }
+
+  // ── RENDER ──
+  function render() {
+    if (wiggleTimer) { wiggleTimer.stop(); wiggleTimer = null; }
+
+    const redCount = shells.filter(d => d.color === "red").length;
+    const blueCount = N - redCount;
+    const pRed = redCount / N;
+
+    genText.text(`Generation ${generation}`);
+
+    if (redCount === N) {
+      fixedText.attr("fill", RED).text("Red shells have taken over");
+    } else if (blueCount === N) {
+      fixedText.attr("fill", BLUE).text("Blue shells have taken over");
+    } else {
+      fixedText.text("");
+    }
+
+    barFill.attr("width", barW * pRed);
+    redLabel.text(`Red: ${redCount}`);
+    blueLabel.text(`Blue: ${blueCount}`);
+
+    const r = N <= 40 ? 10 : N <= 90 ? 7.5 : 6;
+
+    const snailData = shells.map((d, i) => ({
+      ...d,
+      x0: positions[i]?.x ?? 360,
+      y0: positions[i]?.y ?? 270,
+      phase: i * 0.7,
+      amp: 0.8 + (i % 5) * 0.18,
+      r
+    }));
+
+    shellLayer.selectAll("g.snail").remove();
+
+    const groups = shellLayer.selectAll("g.snail")
+      .data(snailData, d => d.id)
+      .join("g").attr("class","snail")
+      .attr("transform", d => `translate(${d.x0},${d.y0})`)
+      .style("opacity", 0);
+
+    groups.transition().duration(220).style("opacity", 1);
+
+    groups.each(function(d) {
+      drawShell(d3.select(this), d.r, d.color === "red" ? RED : BLUE);
+    });
+
+    wiggleTimer = d3.timer(elapsed => {
+      const t = elapsed / 1000;
+      groups.attr("transform", d => {
+        const dx = Math.sin(t * 1.15 + d.phase) * d.amp;
+        const dy = Math.cos(t * 0.9 + d.phase * 1.25) * d.amp * 0.55;
+        return `translate(${d.x0 + dx},${d.y0 + dy})`;
+      });
+    });
+  }
+
+  function resetIsland() {
+    stopPlayback();
+    generation = 0;
+    positions = makePositions(N);
+    shells = makePopulation(N, 0.5);
+    render();
+  }
+
+  function stepGeneration() {
+    const redNow = shells.filter(d => d.color === "red").length;
+    const p = redNow / N;
+    if (p === 0 || p === 1) { stopPlayback(); return; }
+    generation++;
+    shells = makePopulation(N, p);
+    render();
+  }
+
+  function stopPlayback() {
+    if (timer) { timer.stop(); timer = null; }
+    playing = false;
+    document.getElementById("btn-play").textContent = "▶ Play";
+  }
+
+  function startPlayback() {
+    stopPlayback();
+    playing = true;
+    document.getElementById("btn-play").textContent = "⏸ Pause";
+    timer = d3.interval(() => {
+      stepGeneration();
+      const p = shells.filter(d => d.color === "red").length / N;
+      if (p === 0 || p === 1) stopPlayback();
+    }, speed);
+  }
+
+  document.getElementById("btn-small").addEventListener("click", () => { N=30; updateSizeButtons(); resetIsland(); });
+  document.getElementById("btn-medium").addEventListener("click", () => { N=80; updateSizeButtons(); resetIsland(); });
+  document.getElementById("btn-large").addEventListener("click", () => { N=140; updateSizeButtons(); resetIsland(); });
+
+  function updateSizeButtons() {
+    document.getElementById("btn-small").classList.toggle("active", N===30);
+    document.getElementById("btn-medium").classList.toggle("active", N===80);
+    document.getElementById("btn-large").classList.toggle("active", N===140);
+  }
+
+  document.getElementById("btn-play").addEventListener("click", () => {
+    playing ? stopPlayback() : startPlayback();
+  });
+
+  document.getElementById("btn-speed").addEventListener("click", () => {
+    turbo = !turbo;
+    speed = turbo ? 90 : 380;
+    const btn = document.getElementById("btn-speed");
+    btn.textContent = turbo ? "🐢 Normal" : "⚡ Faster";
+    btn.classList.toggle("turbo", turbo);
+    if (playing) startPlayback();
+  });
+
+  resetIsland();
+
+})();
+</script>
+
+</body>
+</html>

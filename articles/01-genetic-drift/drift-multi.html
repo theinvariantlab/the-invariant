@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Genetic Drift — Multiple Populations — The Invariant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+  <style>
+    :root {
+      --bg: #F0F2F5;
+      --navy: #1C2B4A;
+      --blue: #4A6FA5;
+      --blue-pale: #DCE8F5;
+      --text-muted: #6B7A96;
+      --border: #D4DCEA;
+      --red: #C94040;
+      --green: #1A7A3A;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+      min-height: 100vh;
+    }
+
+    .wrapper {
+      width: 100%;
+      max-width: 820px;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .header h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.4rem;
+      font-weight: 400;
+      color: var(--navy);
+      margin-bottom: 0.4rem;
+    }
+
+    .header p {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    /* ── CONTROLS GRID ── */
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 20px;
+      margin-bottom: 12px;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+    }
+
+    .control-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .control-row.full {
+      grid-column: 1 / -1;
+    }
+
+    .control-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      accent-color: var(--navy);
+      height: 3px;
+      cursor: pointer;
+    }
+
+    .range-val {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      color: var(--navy);
+      font-weight: 500;
+      min-width: 36px;
+      text-align: right;
+    }
+
+    .btn {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.45rem 1rem;
+      border: 1px solid var(--border);
+      background: var(--navy);
+      color: white;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: background 0.15s;
+      animation: pulse 1.8s ease 0.6s 2;
+    }
+
+    .btn:hover { background: var(--blue); border-color: var(--blue); }
+
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(28,43,74,0.5); }
+      60%  { box-shadow: 0 0 0 7px rgba(28,43,74,0); }
+      100% { box-shadow: 0 0 0 0 rgba(28,43,74,0); }
+    }
+
+    /* ── SUMMARY ── */
+    .summary {
+      text-align: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      height: 1.2em;
+    }
+
+    .summary strong { color: var(--navy); }
+    .summary .s-green { color: var(--green); font-weight: 500; }
+    .summary .s-red { color: var(--red); font-weight: 500; }
+
+    /* ── CHART ── */
+    #chart-container svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: white;
+    }
+
+    /* ── BACK LINK ── */
+    .back {
+      margin-top: 1.5rem;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: color 0.2s;
+    }
+    .back:hover { color: var(--blue); }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <div class="header">
+    <h1>Many Islands, Same Start</h1>
+    <p>Watch identical populations diverge under pure random sampling.</p>
+  </div>
+
+  <div class="controls">
+    <div class="control-row">
+      <span class="control-label">Population size</span>
+      <input type="range" id="sl-pop" min="10" max="500" value="50" step="1">
+      <span class="range-val" id="val-pop">50</span>
+    </div>
+    <div class="control-row">
+      <span class="control-label">Generations</span>
+      <input type="range" id="sl-gen" min="10" max="200" value="80" step="1">
+      <span class="range-val" id="val-gen">80</span>
+    </div>
+    <div class="control-row">
+      <span class="control-label">Populations</span>
+      <input type="range" id="sl-runs" min="5" max="80" value="30" step="1">
+      <span class="range-val" id="val-runs">30</span>
+    </div>
+    <div class="control-row">
+      <span class="control-label">Initial frequency</span>
+      <input type="range" id="sl-p0" min="0.05" max="0.95" value="0.5" step="0.01">
+      <span class="range-val" id="val-p0">0.50</span>
+    </div>
+    <div class="control-row full" style="justify-content:center; padding-top:4px;">
+      <button class="btn" id="btn-resample">↺ Resample</button>
+    </div>
+  </div>
+
+  <div class="summary" id="summary"></div>
+  <div id="chart-container"></div>
+
+  <a href="../../index.html" class="back">← The Invariant</a>
+</div>
+
+<script>
+(function() {
+
+  const RED   = "#C94040";
+  const GREEN = "#1A7A3A";
+  const NAVY  = "#1C2B4A";
+  const MUTED = "#6B7A96";
+  const GRID  = "#E8ECF2";
+  const LIGHT = "#F8FAFC";
+
+  // ── STATE ──
+  let populationSize = 50;
+  let generations    = 80;
+  let runs           = 30;
+  let p0             = 0.5;
+
+  // ── HELPERS ──
+  function lcgRng(seed) {
+    let s = (seed || 1) >>> 0;
+    return function() {
+      s = Math.imul(1664525, s) + 1013904223 >>> 0;
+      return s / 4294967296;
+    };
+  }
+
+  function binomial(n, p, rng) {
+    let x = 0;
+    for (let i = 0; i < n; i++) if (rng() < p) x++;
+    return x;
+  }
+
+  function simulate() {
+    const rng = lcgRng(Math.floor(Math.random() * 1e9));
+    const allRuns = [];
+
+    for (let r = 0; r < runs; r++) {
+      let p = p0;
+      const traj = [{ g: 0, p, r }];
+      for (let g = 1; g <= generations; g++) {
+        const count = binomial(populationSize, p, rng);
+        p = count / populationSize;
+        traj.push({ g, p, r });
+        if (p === 0 || p === 1) {
+          for (let h = g + 1; h <= generations; h++) traj.push({ g: h, p, r });
+          break;
+        }
+      }
+      allRuns.push(traj);
+    }
+
+    const fixedOne  = allRuns.filter(t => t[t.length-1].p === 1).length;
+    const fixedZero = allRuns.filter(t => t[t.length-1].p === 0).length;
+    const drifting  = runs - fixedOne - fixedZero;
+    return { allRuns, fixedOne, fixedZero, drifting };
+  }
+
+  // ── CHART ──
+  const W = 760, H = 440;
+  const M = { top: 28, right: 90, bottom: 48, left: 58 };
+
+  const svg = d3.select("#chart-container")
+    .append("svg")
+    .attr("viewBox", [0, 0, W, H]);
+
+  // Background
+  svg.append("rect").attr("width", W).attr("height", H).attr("fill", "white");
+
+  const innerW = W - M.left - M.right;
+  const innerH = H - M.top  - M.bottom;
+
+  const xScale = d3.scaleLinear().range([M.left, M.left + innerW]);
+  const yScale = d3.scaleLinear().domain([0, 1]).range([M.top + innerH, M.top]);
+
+  // Grid
+  const gridG = svg.append("g").attr("class","grid");
+  d3.range(0, 1.01, 0.2).forEach(v => {
+    gridG.append("line")
+      .attr("x1", M.left).attr("x2", M.left + innerW)
+      .attr("y1", yScale(v)).attr("y2", yScale(v))
+      .attr("stroke", GRID).attr("stroke-width", 1);
+  });
+
+  // Fixation lines
+  svg.append("line").attr("class","fix-one")
+    .attr("x1", M.left).attr("x2", M.left + innerW)
+    .attr("y1", yScale(1)).attr("y2", yScale(1))
+    .attr("stroke", GREEN).attr("stroke-width", 1.5)
+    .attr("stroke-dasharray","5,4");
+
+  svg.append("line").attr("class","fix-zero")
+    .attr("x1", M.left).attr("x2", M.left + innerW)
+    .attr("y1", yScale(0)).attr("y2", yScale(0))
+    .attr("stroke", RED).attr("stroke-width", 1.5)
+    .attr("stroke-dasharray","5,4");
+
+  // Initial freq line (updated on redraw)
+  const p0Line = svg.append("line")
+    .attr("x1", M.left).attr("x2", M.left + innerW)
+    .attr("stroke", "#B0BCCC").attr("stroke-width", 1)
+    .attr("stroke-dasharray","2,5");
+
+  // Trajectory paths group
+  const pathGroup = svg.append("g").attr("class","paths");
+
+  // Endpoint dots group
+  const dotGroup = svg.append("g").attr("class","dots");
+
+  // Axes
+  const xAxisG = svg.append("g").attr("transform",`translate(0,${M.top + innerH})`);
+  const yAxisG = svg.append("g").attr("transform",`translate(${M.left},0)`);
+
+  // Axis labels
+  svg.append("text").attr("x", M.left + innerW/2).attr("y", H - 8)
+    .attr("text-anchor","middle").attr("fill", MUTED)
+    .style("font-family","'DM Mono', monospace").style("font-size","11px")
+    .style("letter-spacing","0.08em").text("GENERATION");
+
+  svg.append("text")
+    .attr("transform",`translate(14,${M.top + innerH/2}) rotate(-90)`)
+    .attr("text-anchor","middle").attr("fill", MUTED)
+    .style("font-family","'DM Mono', monospace").style("font-size","11px")
+    .style("letter-spacing","0.08em").text("ALLELE FREQUENCY");
+
+  // Fixation labels
+  svg.append("text").attr("x", M.left + innerW + 6).attr("y", yScale(1) + 4)
+    .attr("fill", GREEN).style("font-family","'DM Mono', monospace")
+    .style("font-size","10px").style("font-weight","500").text("fixed 1");
+
+  svg.append("text").attr("x", M.left + innerW + 6).attr("y", yScale(0) + 4)
+    .attr("fill", RED).style("font-family","'DM Mono', monospace")
+    .style("font-size","10px").style("font-weight","500").text("fixed 0");
+
+  function redraw() {
+    xScale.domain([0, generations]);
+
+    // Update p0 line
+    p0Line.attr("y1", yScale(p0)).attr("y2", yScale(p0));
+
+    // Update axes
+    xAxisG.call(
+      d3.axisBottom(xScale).ticks(Math.min(8, generations)).tickSizeOuter(0)
+    ).call(g => g.selectAll(".domain, .tick line").attr("stroke", GRID))
+     .call(g => g.selectAll("text")
+       .attr("fill", MUTED)
+       .style("font-family","'DM Mono', monospace")
+       .style("font-size","10px"));
+
+    yAxisG.call(
+      d3.axisLeft(yScale).ticks(5).tickFormat(d3.format(".1f")).tickSizeOuter(0)
+    ).call(g => g.selectAll(".domain, .tick line").attr("stroke", GRID))
+     .call(g => g.selectAll("text")
+       .attr("fill", MUTED)
+       .style("font-family","'DM Mono', monospace")
+       .style("font-size","10px"));
+
+    // Simulate
+    const { allRuns, fixedOne, fixedZero, drifting } = simulate();
+
+    // Summary
+    document.getElementById("summary").innerHTML =
+      `<span class="s-green">${fixedOne}</span> fixed at 1 &nbsp;•&nbsp; ` +
+      `<span class="s-red">${fixedZero}</span> fixed at 0 &nbsp;•&nbsp; ` +
+      `<strong>${drifting}</strong> still drifting`;
+
+    // Line generator
+    const line = d3.line()
+      .x(d => xScale(d.g))
+      .y(d => yScale(d.p))
+      .curve(d3.curveMonotoneX);
+
+    // Paths
+    const paths = pathGroup.selectAll("path").data(allRuns);
+
+    paths.enter().append("path")
+      .merge(paths)
+      .attr("fill","none")
+      .attr("stroke", d => {
+        const last = d[d.length-1].p;
+        if (last === 1) return GREEN;
+        if (last === 0) return RED;
+        return NAVY;
+      })
+      .attr("stroke-width", 1.6)
+      .attr("stroke-opacity", 0.5)
+      .attr("d", d => line(d))
+      .each(function() {
+        const len = this.getTotalLength();
+        d3.select(this)
+          .attr("stroke-dasharray", `${len} ${len}`)
+          .attr("stroke-dashoffset", len)
+          .transition().duration(1200).ease(d3.easeCubicOut)
+          .attr("stroke-dashoffset", 0);
+      });
+
+    paths.exit().remove();
+
+    // Dots
+    const endPts = allRuns.map(t => t[t.length-1]);
+    const dots = dotGroup.selectAll("circle").data(endPts);
+
+    dots.enter().append("circle")
+      .merge(dots)
+      .attr("cx", d => xScale(d.g))
+      .attr("cy", d => yScale(d.p))
+      .attr("fill", d => d.p === 1 ? GREEN : d.p === 0 ? RED : NAVY)
+      .attr("opacity", 0.85)
+      .attr("r", 0)
+      .transition().delay(1000).duration(250)
+      .attr("r", 3.5);
+
+    dots.exit().remove();
+  }
+
+  // ── SLIDER WIRING ──
+  function wire(id, valId, parse, setter) {
+    const sl = document.getElementById(id);
+    const vl = document.getElementById(valId);
+    sl.addEventListener("input", () => {
+      const v = parse(sl.value);
+      setter(v);
+      vl.textContent = id === "sl-p0" ? v.toFixed(2) : v;
+      redraw();
+    });
+  }
+
+  wire("sl-pop",  "val-pop",  Number, v => populationSize = v);
+  wire("sl-gen",  "val-gen",  Number, v => generations = v);
+  wire("sl-runs", "val-runs", Number, v => runs = v);
+  wire("sl-p0",   "val-p0",   Number, v => p0 = v);
+
+  document.getElementById("btn-resample").addEventListener("click", redraw);
+
+  // ── INIT ──
+  redraw();
+
+})();
+</script>
+</body>
+</html>
