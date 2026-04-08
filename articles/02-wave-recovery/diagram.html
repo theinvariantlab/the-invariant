@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wave Recovery — Diagram v8</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #F7F4EF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 40px 24px;
+  }
+
+  .wrap {
+    background: white;
+    border: 1px solid #E8E4DC;
+    border-radius: 8px;
+    padding: 40px 44px 32px;
+    width: 100%;
+    max-width: 1000px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.05);
+  }
+
+  svg { overflow: visible; display: block; }
+
+  .step-el { opacity: 0; transition: opacity 0.75s ease; }
+  .step-el.show { opacity: 1; }
+
+  .node {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 16px;
+    border-radius: 4px;
+    white-space: nowrap;
+    height: 38px;
+  }
+  .node-num {
+    font-family: 'EB Garamond', serif;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    flex-shrink: 0;
+  }
+  .node-math { flex-shrink: 0; }
+  /* HIGH CONTRAST descriptors */
+  .node-sub {
+    font-family: 'EB Garamond', serif;
+    font-size: 13px;
+    font-style: italic;
+    margin-left: 4px;
+  }
+
+  .katex { font-size: 1em !important; }
+
+  #replay-btn {
+    display: block;
+    margin: 22px auto 0;
+    padding: 6px 26px;
+    border-radius: 20px;
+    border: 1px solid #D4DCEA;
+    background: #F7F4EF;
+    color: #6B7A96;
+    font-family: 'EB Garamond', serif;
+    font-size: 15px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: background 0.2s;
+  }
+  #replay-btn:hover { background: #DCE8F5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<svg width="100%" viewBox="0 0 880 540">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M2 1.5L8 5L2 8.5" fill="none" stroke="context-stroke"
+            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#9BC4E8" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#9BC4E8" stop-opacity="0.03"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Water body — wave at y≈112, seabed at y=420 -->
+  <path d="M36 112 Q120 92 220 108 Q340 126 460 102 Q580 78 740 96 Q820 106 868 100
+           L868 420 L36 420 Z" fill="url(#wg)"/>
+
+  <!-- Seabed line -->
+  <line x1="36" y1="420" x2="868" y2="420" stroke="#C8C2B8" stroke-width="1.2" opacity="0.45"/>
+
+  <!-- y-axis -->
+  <line x1="24" y1="430" x2="24" y2="52"
+        stroke="#DEDAD4" stroke-width="0.9" marker-end="url(#arr)"/>
+  <text font-size="12" font-family="EB Garamond,serif" font-style="italic"
+        x="16" y="46" text-anchor="middle" fill="#C8C4BC">y</text>
+
+  <!-- ══════════════════════════════════════
+       NODE 0 — sensor  (BELOW seabed, y=428)
+  ══════════════════════════════════════ -->
+  <g class="step-el" id="el-s0">
+    <foreignObject x="60" y="428" width="290" height="38">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="node"
+           style="background:#3D4F6A;">
+        <span class="node-num" style="color:#8FAAC8;">⓪</span>
+        <span class="node-math" style="color:#DCE8F5; font-family:'EB Garamond',serif;
+              font-style:italic; font-size:14px;">sensor</span>
+        <span class="node-sub" style="color:#C8DDF2;">discrete pressure measurements</span>
+      </div>
+    </foreignObject>
+  </g>
+
+  <!-- connector ⓪→① -->
+  <g class="step-el" id="el-a01">
+    <line x1="160" y1="426" x2="160" y2="374"
+          stroke="#5A7FAA" stroke-width="1.2" stroke-dasharray="4 3"
+          marker-end="url(#arr)"/>
+  </g>
+
+  <!-- ══════════════════════════════════════
+       NODE 1 — p_b(x)  (y=336)
+  ══════════════════════════════════════ -->
+  <g class="step-el" id="el-s1">
+    <foreignObject x="60" y="336" width="290" height="38">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="node"
+           style="background:#4A6FA5;">
+        <span class="node-num" style="color:#C0D8F0;">①</span>
+        <span class="node-math" id="m-pb" style="color:#EEF4FB;"></span>
+        <span class="node-sub" style="color:#D0E4F8;">Fourier approx. using sensor data</span>
+      </div>
+    </foreignObject>
+  </g>
+
+  <!-- connector ①→② -->
+  <g class="step-el" id="el-a12">
+    <line x1="160" y1="334" x2="160" y2="274"
+          stroke="#5A7FAA" stroke-width="1.2" stroke-dasharray="4 3"
+          marker-end="url(#arr)"/>
+  </g>
+
+  <!-- ══════════════════════════════════════
+       NODE 2 — B(z)  (y=236)
+  ══════════════════════════════════════ -->
+  <g class="step-el" id="el-s2">
+    <foreignObject x="60" y="236" width="290" height="38">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="node"
+           style="background:#D4E6F4; border:1px solid #90BAD8;">
+        <span class="node-num" style="color:#2A5080;">②</span>
+        <span class="node-math" id="m-bz" style="color:#1C3A5E;"></span>
+        <span class="node-sub" style="color:#1E4070;">holomorphic lift using p_b(x)</span>
+      </div>
+    </foreignObject>
+  </g>
+
+  <!-- connector ②→③ -->
+  <g class="step-el" id="el-a23">
+    <line x1="160" y1="234" x2="160" y2="174"
+          stroke="#5A7FAA" stroke-width="1.2" stroke-dasharray="4 3"
+          marker-end="url(#arr)"/>
+  </g>
+
+  <!-- ══════════════════════════════════════
+       NODE 3 — D_s  (y=136, just below wave y≈112)
+  ══════════════════════════════════════ -->
+  <g class="step-el" id="el-s3">
+    <circle cx="160" cy="112" r="4.5" fill="#185FA5"/>
+    <line x1="160" y1="117" x2="160" y2="134"
+          stroke="#5A7FAA" stroke-width="1.2" stroke-dasharray="4 3"/>
+    <foreignObject x="60" y="136" width="290" height="38">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="node"
+           style="background:#EBF3FA; border:1px solid #90BAD8;">
+        <span class="node-num" style="color:#2A5080;">③</span>
+        <span class="node-math" id="m-ds" style="color:#1C3A5E;"></span>
+        <span class="node-sub" style="color:#1E4070;">surface integral using ℬ(z)</span>
+      </div>
+    </foreignObject>
+  </g>
+
+  <!-- Wave profile — revealed last -->
+  <g class="step-el" id="el-wave">
+    <path d="M36 112 Q120 92 220 108 Q340 126 460 102 Q580 78 740 96 Q820 106 868 100"
+          fill="none" stroke="#185FA5" stroke-width="2.2"/>
+    <text font-size="13" font-family="EB Garamond,serif" font-style="italic"
+          x="878" y="104" fill="#185FA5">η</text>
+  </g>
+
+  <!-- Connector ③ → formula -->
+  <g class="step-el" id="el-a34">
+    <path d="M352 155 Q410 155 430 200"
+          fill="none" stroke="#5A7FAA" stroke-width="1.1"
+          stroke-dasharray="4 3" marker-end="url(#arr)" opacity="0.5"/>
+  </g>
+
+  <!-- ══════════════════════════════════════
+       NODE 4 — η(x) formula
+       η(x) = [formula] all on one conceptual unit
+  ══════════════════════════════════════ -->
+  <g class="step-el" id="el-s4">
+    <line x1="438" y1="175" x2="438" y2="370"
+          stroke="#185FA5" stroke-width="1" opacity="0.15"/>
+
+    <foreignObject x="450" y="175" width="420" height="180">
+      <div xmlns="http://www.w3.org/1999/xhtml"
+           style="padding:16px 22px; display:flex; flex-direction:column; gap:12px;">
+
+        <span style="font-family:'EB Garamond',serif; font-size:11px;
+                     letter-spacing:0.09em; text-transform:uppercase;
+                     color:#185FA5; opacity:0.7;">④  wave profile</span>
+
+        <!-- η(x) = and formula as one display block -->
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:nowrap;">
+          <span id="m-eta-lhs" style="color:#185FA5; font-size:1.1em; flex-shrink:0;"></span>
+          <span id="m-formula" style="color:#0F2A52;"></span>
+        </div>
+
+      </div>
+    </foreignObject>
+  </g>
+
+</svg>
+
+<button id="replay-btn" onclick="runAnimation()">↺ &nbsp;replay</button>
+</div>
+
+<script>
+function K(id, tex, display) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  katex.render(tex, el, { throwOnError: false, displayMode: !!display });
+}
+
+function renderMath() {
+  K('m-pb',      'p_b(x)');
+  K('m-bz',      '\\mathcal{B}(z)');
+  K('m-ds',      '\\mathcal{D}_s');
+  K('m-eta-lhs', '\\eta(x)\\ =');
+  K('m-formula',
+    'g^{-1}\\!\\left[B - \\sqrt{(B - ga)^2 - 2g\\operatorname{Im}(\\mathcal{D}_s)}\\right]');
+}
+
+const sequence = [
+  { id: 'el-s0',   delay: 800  },
+  { id: 'el-a01',  delay: 1700 },
+  { id: 'el-s1',   delay: 2000 },
+  { id: 'el-a12',  delay: 2900 },
+  { id: 'el-s2',   delay: 3200 },
+  { id: 'el-a23',  delay: 4100 },
+  { id: 'el-s3',   delay: 4400 },
+  { id: 'el-a34',  delay: 5300 },
+  { id: 'el-s4',   delay: 5700 },
+  { id: 'el-wave', delay: 6900 },
+];
+
+function runAnimation() {
+  // Reset visibility
+  sequence.forEach(s => document.getElementById(s.id)?.classList.remove('show'));
+  
+  // 1. Calculate the end time of the last animation step
+  const maxDelay = Math.max(...sequence.map(s => s.delay));
+
+  // 2. Trigger the sequence
+  sequence.forEach(s => {
+    setTimeout(() => document.getElementById(s.id)?.classList.add('show'), s.delay);
+  });
+
+  // 3. SIGNAL FOR TIMECUT: Set the flag after the last step + a small buffer (1.5s)
+  setTimeout(() => {
+      window.capturerFinished = true;
+      console.log("Animation complete. Signal sent.");
+  }, maxDelay + 1500); 
+}
+
+window.addEventListener('load', () => {
+  renderMath();
+  setTimeout(runAnimation, 700);
+});
+</script>
+</body>
+</html>
