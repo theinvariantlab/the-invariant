@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pressure at the Seabed — The Invariant</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#f0ede8;font-family:'DM Sans',sans-serif;display:flex;flex-direction:column;align-items:center;padding-bottom:48px}
+.hdr{width:100%;padding:16px 32px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.18em;color:#8a96aa;text-transform:uppercase;border-bottom:1px solid #d4d0c8;background:#f0ede8}
+.wrap{width:100%;max-width:960px;padding:0 20px}
+.scene{position:relative;width:100%;height:600px;margin-top:28px;border-radius:4px;overflow:hidden;box-shadow:0 4px 32px rgba(10,20,50,.22)}
+#c{position:absolute;inset:0;width:100%;height:100%}
+
+.overlay{position:absolute;inset:0;pointer-events:none}
+
+@keyframes pulse-glow {
+  0%,100% { box-shadow: 0 0 8px 2px rgba(100,180,255,.35), 0 0 0 1px rgba(120,190,255,.3); }
+  50%      { box-shadow: 0 0 22px 6px rgba(100,180,255,.65), 0 0 0 1px rgba(160,220,255,.6); }
+}
+@keyframes pulse-glow-btn {
+  0%,100% { box-shadow: 0 0 8px 2px rgba(80,160,255,.4); }
+  50%      { box-shadow: 0 0 24px 8px rgba(80,180,255,.75); }
+}
+
+.controls{
+  position:absolute;
+  bottom:108px;
+  left:28px;
+  width:230px;
+  background:rgba(4,14,36,.82);
+  border:1px solid rgba(140,200,255,.35);
+  border-radius:4px;
+  padding:14px 16px 16px;
+  pointer-events:all;
+  backdrop-filter:blur(6px);
+  animation: pulse-glow 2.2s ease-in-out infinite;
+}
+.controls.interacted{
+  animation: none;
+  box-shadow: 0 0 8px 2px rgba(100,180,255,.2);
+}
+.ctrl-title{
+  font-family:'DM Mono',monospace;
+  font-size:10px;
+  font-weight:500;
+  letter-spacing:.16em;
+  color:rgba(255,255,255,.95);
+  text-transform:uppercase;
+  margin-bottom:12px;
+}
+.ctrl-row{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  margin-bottom:13px;
+}
+.ctrl-row:last-of-type{margin-bottom:0}
+.ctrl-label{
+  display:flex;
+  justify-content:space-between;
+  font-family:'DM Mono',monospace;
+  font-size:9.5px;
+  font-weight:500;
+  color:rgba(200,228,255,.85);
+}
+.ctrl-label span{color:#fff;font-weight:500}
+input[type=range]{
+  width:100%;
+  -webkit-appearance:none;
+  height:2px;
+  background:rgba(120,185,255,.35);
+  border-radius:1px;
+  outline:none;
+  cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:16px;height:16px;
+  border-radius:50%;
+  background:#7ac8ff;
+  border:2px solid #fff;
+  cursor:pointer;
+  box-shadow:0 0 6px rgba(100,200,255,.6);
+}
+
+.btn-reveal{
+  position:absolute;
+  bottom:108px;
+  right:28px;
+  font-family:'DM Mono',monospace;
+  font-size:11px;
+  font-weight:500;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  color:#fff;
+  background:rgba(50,120,220,.70);
+  border:1px solid rgba(140,200,255,.55);
+  border-radius:3px;
+  padding:12px 22px;
+  cursor:pointer;
+  pointer-events:all;
+  transition:background .2s, transform .1s;
+  backdrop-filter:blur(6px);
+  animation: pulse-glow-btn 2.2s ease-in-out infinite;
+}
+.btn-reveal:hover{background:rgba(70,148,240,.85);animation:none}
+.btn-reveal:active{transform:scale(.97)}
+.btn-reveal.hidden{display:none}
+
+.btn-again{
+  position:absolute;
+  bottom:108px;
+  right:28px;
+  font-family:'DM Mono',monospace;
+  font-size:11px;
+  font-weight:500;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:rgba(200,228,255,.9);
+  background:rgba(10,25,55,.65);
+  border:1px solid rgba(100,160,255,.30);
+  border-radius:3px;
+  padding:12px 22px;
+  cursor:pointer;
+  pointer-events:all;
+  transition:background .2s;
+  backdrop-filter:blur(6px);
+  display:none;
+}
+.btn-again:hover{background:rgba(20,45,90,.80)}
+
+.cap{margin-top:14px;font-size:12.5px;font-style:italic;color:#6b7a96;line-height:1.65;padding:0 4px}
+.cap strong{font-style:normal;font-weight:500;color:#3a4a6a}
+</style>
+</head>
+<body>
+<div class="hdr">The Invariant / Interactive I / The seabed knows the pressure</div>
+<div class="wrap">
+  <div class="scene">
+    <canvas id="c"></canvas>
+    <div class="overlay">
+      <div class="controls">
+        <div class="ctrl-title">Shape your guess</div>
+        <div class="ctrl-row">
+          <div class="ctrl-label">Wave height <span id="lbl-h">medium</span></div>
+          <input type="range" id="sl-h" min="0" max="100" value="50">
+        </div>
+        <div class="ctrl-row">
+          <div class="ctrl-label">Wave steepness <span id="lbl-s">medium</span></div>
+          <input type="range" id="sl-s" min="0" max="100" value="50">
+        </div>
+      </div>
+      <button class="btn-reveal" id="btn-reveal">Reveal the wave</button>
+      <button class="btn-again" id="btn-again">Try again</button>
+    </div>
+  </div>
+  <p class="cap">Pressure measurements on the seabed. The sensors record pressure, not position. The surface wave is <strong>what we are trying to recover</strong>. Shape your guess before revealing.</p>
+</div>
+
+<script>
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+const slH = document.getElementById('sl-h');
+const slS = document.getElementById('sl-s');
+const lblH = document.getElementById('lbl-h');
+const lblS = document.getElementById('lbl-s');
+const btnReveal = document.getElementById('btn-reveal');
+const btnAgain = document.getElementById('btn-again');
+
+// 20 measurements, evenly spaced, no value labels
+const M = [
+  {x:.025,p:1.0996},{x:.075,p:1.0944},{x:.125,p:1.0769},
+  {x:.175,p:1.0481},{x:.225,p:1.0107},{x:.275,p:0.9802},
+  {x:.325,p:0.9555},{x:.375,p:0.9320},{x:.425,p:0.9168},
+  {x:.475,p:0.9055},{x:.525,p:0.9038},{x:.575,p:0.9101},
+  {x:.625,p:0.9281},{x:.675,p:0.9510},{x:.725,p:0.9800},
+  {x:.775,p:1.0132},{x:.825,p:1.0445},{x:.875,p:1.0710},
+  {x:.925,p:1.0903},{x:.975,p:1.0994}
+];
+const PMEAN=1.0, PMIN=0.9032, PMAX=1.1004;
+
+let W=0, H=0, animT=0;
+let revealed=false, revealProgress=0;
+
+// Layout
+const SY=.09, BY=.80, ML=.04, MR=.96, NS=14;
+const DZB=.735, DZH=.16;
+
+function rsz(){
+  const d=devicePixelRatio||1;
+  W=cv.offsetWidth; H=cv.offsetHeight;
+  cv.width=W*d; cv.height=H*d;
+  ctx.setTransform(d,0,0,d,0,0);
+}
+
+function mx2x(mx){return W*ML+mx*W*(MR-ML);}
+function p2y(p){
+  const gT=H*(DZB-DZH), gB=H*DZB;
+  return gT+(gB-gT)-((p-(PMIN-.01))/((PMAX+.01)-(PMIN-.01)))*(gB-gT);
+}
+
+// Guess wave — purely in canvas pixels, no physical scale
+// Surface zone: center at surfY, spans roughly ±guessAmp pixels
+function guessParams(){
+  const h = slH.value/100;  // 0..1
+  const s = slS.value/100;  // 0..1
+  // Height: slider controls pixel amplitude, range feels "plausible"
+  // but is deliberately smaller than the real wave
+  const pxAmp  = 12 + h * 28;   // 12..40 px — reader will undershoot
+  const steep  = s * 1.2;        // 0..1.2 steepness exponent
+  return {pxAmp, steep};
+}
+
+// Guess wave canvas y — purely pixel-based, centered on surfY
+function guessCanvasY(xf, surfY){
+  const {pxAmp, steep} = guessParams();
+  const phi = xf * 2 * Math.PI;
+  // Reader's guess: cosine with mild steepness correction
+  const eta = Math.cos(phi) - steep * 0.15 * Math.cos(2*phi);
+  return surfY - pxAmp * eta;
+}
+
+// Real Stokes wave — fixed pixel scale, taller and asymmetric but smooth
+// Crest sharper than trough, clearly not a cosine, not a triangle
+function realCanvasY(xf, surfY){
+  const phi = xf * 2 * Math.PI;
+  // Stokes expansion with physically realistic coefficients
+  // a=0.20, kd=1.337 from thesis — second harmonic ~15% of first, third ~3%
+  const eta = Math.cos(phi)
+             + 0.15 * Math.cos(2*phi)   // raises crest, deepens trough slightly
+             - 0.03 * Math.cos(3*phi);  // mild crest sharpening
+  // eta range: max ~1.15 (crest), min ~-0.88 (trough) — asymmetric
+  // Render: crest at 68px above surfY, trough at 48px below
+  const crestPx = 68, troughPx = 48;
+  const etaMax = 1.15, etaMin = 0.88;
+  if(eta >= 0){
+    return surfY - (eta / etaMax) * crestPx;
+  } else {
+    return surfY + ((-eta) / etaMin) * troughPx;
+  }
+}
+
+// Label helpers
+function heightLabel(v){
+  if(v<30) return 'low';
+  if(v<70) return 'medium';
+  return 'high';
+}
+function steepLabel(v){
+  if(v<30) return 'gentle';
+  if(v<70) return 'medium';
+  return 'steep';
+}
+
+slH.addEventListener('input', ()=>{
+  lblH.textContent=heightLabel(slH.value);
+  document.querySelector('.controls').classList.add('interacted');
+});
+slS.addEventListener('input', ()=>{
+  lblS.textContent=steepLabel(slS.value);
+  document.querySelector('.controls').classList.add('interacted');
+});
+
+btnReveal.addEventListener('click', ()=>{
+  revealed=true;
+  btnReveal.classList.add('hidden');
+  btnAgain.style.display='block';
+});
+
+btnAgain.addEventListener('click', ()=>{
+  revealed=false;
+  revealProgress=0;
+  btnReveal.classList.remove('hidden');
+  btnAgain.style.display='none';
+});
+
+function draw(t){
+  ctx.clearRect(0,0,W,H);
+  const sy=H*SY, by=H*BY;
+
+  // Water body
+  const wg=ctx.createLinearGradient(0,0,0,H);
+  wg.addColorStop(0,'#0c2448');
+  wg.addColorStop(SY,'#091d3a');
+  wg.addColorStop(BY,'#050f22');
+  wg.addColorStop(1,'#020810');
+  ctx.fillStyle=wg; ctx.fillRect(0,0,W,H);
+
+  // Caustic rays
+  for(let i=0;i<8;i++){
+    const rx=W*(.05+i*.13)+Math.sin(t*.0007+i*1.3)*W*.02;
+    const rg=ctx.createLinearGradient(rx,sy,rx+W*.04,by*.5);
+    rg.addColorStop(0,'rgba(80,160,230,.07)');
+    rg.addColorStop(1,'rgba(80,160,230,0)');
+    ctx.beginPath();
+    ctx.moveTo(rx,sy);
+    ctx.lineTo(rx+W*.028,by*.5);
+    ctx.lineTo(rx+W*.052,by*.5);
+    ctx.lineTo(rx+W*.024,sy);
+    ctx.fillStyle=rg; ctx.fill();
+  }
+
+  // Particles
+  const pts=[.11,.23,.31,.17,.47,.31,.64,.14,.78,.33,.89,.23,.95,.42,.21,.54,.56,.44,.79,.48];
+  for(let i=0;i<pts.length;i+=2){
+    const px=(pts[i]*W+Math.sin(t*.0004+i)*9)%W;
+    const py=sy+pts[i+1]*(by-sy)*.82+Math.sin(t*.0006+i*2)*4;
+    ctx.beginPath(); ctx.arc(px,py,.8,0,Math.PI*2);
+    ctx.fillStyle='rgba(140,200,240,.16)'; ctx.fill();
+  }
+
+  // Fish
+  fish(W*(.20+Math.sin(t*.0005)*.07), H*.26+Math.sin(t*.0009)*6, t, 1);
+  fish(W*(.73+Math.sin(t*.0003+2)*.05), H*.40+Math.sin(t*.0007)*5, t, -1);
+
+  // ── SURFACE ZONE ───────────────────────────────────────────────────────
+  if(!revealed){
+    // Blurred unknown surface — draw before guess wave
+    drawBlurredSurface(sy, t, 1.0);
+    // Guess wave drawn on top of blur
+    drawGuessWave(sy, t);
+  } else {
+    // Animate reveal: blur fades, real wave sharpens
+    revealProgress = Math.min(1, revealProgress + 0.015);
+    const blurAlpha = 1 - revealProgress;
+    drawBlurredSurface(sy, t, blurAlpha);
+    drawRealWave(sy, revealProgress);
+  }
+
+  // Surface question label (fades on reveal)
+  const labelAlpha = revealed ? Math.max(0, 1 - revealProgress*3) : 1;
+  if(labelAlpha > 0){
+    ctx.globalAlpha = labelAlpha;
+    const lx=W*.5, ly=sy-22;
+    ctx.shadowColor='rgba(120,190,255,.6)'; ctx.shadowBlur=16;
+    ctx.fillStyle='rgba(255,255,255,.97)';
+    ctx.font='600 15px DM Sans,sans-serif'; ctx.textAlign='center';
+    ctx.fillText('What does the wave look like above?',lx,ly);
+    ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(215,238,255,.88)';
+    ctx.font='600 10px DM Mono,monospace';
+    ctx.fillText('SURFACE PROFILE / UNKNOWN',lx,ly+15);
+    ctx.globalAlpha=1;
+  }
+
+  // Recovered label (appears on reveal)
+  if(revealed && revealProgress > 0.6){
+    const a = Math.min(1,(revealProgress-0.6)/0.4);
+    ctx.globalAlpha=a;
+    ctx.shadowColor='rgba(100,255,180,.5)'; ctx.shadowBlur=14;
+    ctx.fillStyle='rgba(255,255,255,.97)';
+    ctx.font='600 15px DM Sans,sans-serif'; ctx.textAlign='center';
+    ctx.fillText('Recovered surface  η(x)',W*.5,H*SY-22);
+    ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(180,255,220,.88)';
+    ctx.font='600 10px DM Mono,monospace';
+    ctx.fillText('FROM PRESSURE DATA BELOW',W*.5,H*SY-7);
+    ctx.globalAlpha=1;
+  }
+
+  // ── DASHED LINES from dots to surface ──────────────────────────────────
+  M.forEach(m=>{
+    const dcx=mx2x(m.x), dcy=p2y(m.p);
+    const lineTop=sy+24, lineBot=dcy-10;
+    if(lineBot<=lineTop) return;
+    const g=ctx.createLinearGradient(dcx,lineTop,dcx,lineBot);
+    g.addColorStop(0,'rgba(170,220,255,.48)');
+    g.addColorStop(.55,'rgba(130,195,250,.18)');
+    g.addColorStop(1,'rgba(100,170,235,.04)');
+    ctx.setLineDash([2,7]);
+    ctx.strokeStyle=g; ctx.lineWidth=.85;
+    ctx.beginPath(); ctx.moveTo(dcx,lineTop); ctx.lineTo(dcx,lineBot); ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  // ── SEABED ─────────────────────────────────────────────────────────────
+  ctx.beginPath(); ctx.moveTo(0,by);
+  for(let x=0;x<=W;x+=6)
+    ctx.lineTo(x,by+Math.sin(x*.04)*3.5+Math.cos(x*.025)*2);
+  ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath();
+  const bg=ctx.createLinearGradient(0,by,0,H);
+  bg.addColorStop(0,'#1c1608'); bg.addColorStop(.4,'#241e0c'); bg.addColorStop(1,'#0d0b05');
+  ctx.fillStyle=bg; ctx.fill();
+
+  // Sand ripples
+  ctx.strokeStyle='rgba(120,90,40,.15)'; ctx.lineWidth=1;
+  for(let i=0;i<12;i++){
+    ctx.beginPath();
+    ctx.ellipse(W*(.04+i*.085),by+9,15,2.5,0,0,Math.PI);
+    ctx.stroke();
+  }
+
+  // Seaweed
+  [[.04,18],[.08,13],[.27,20],[.31,14],[.60,18],[.64,13],[.88,21],[.93,14]].forEach(([f,h],i)=>
+    weed(W*f,by+1,t+i*.6,h,i%2===0?'#15422a':'#1c3820'));
+
+  // Rocks & starfish
+  rock(W*.17,by+3,20,12); rock(W*.19,by+5,12,8);
+  rock(W*.45,by+3,16,10);
+  rock(W*.72,by+4,22,13); rock(W*.74,by+6,10,7);
+  star(W*.37,by+5,11,'#8b4010',t);
+  star(W*.83,by+5, 9,'#9a5520',t*.8+1);
+
+  // ── PRESSURE DOTS ──────────────────────────────────────────────────────
+  dots();
+
+  // ── SENSOR ARRAY ───────────────────────────────────────────────────────
+  sensors(by,t);
+}
+
+function drawBlurredSurface(sy, t, alpha){
+  if(alpha<=0) return;
+  ctx.globalAlpha=alpha;
+  for(let b=0;b<18;b++){
+    const sp=b*2.0, al=.22*(1-b/18);
+    const yo=(b%2===0?1:-1)*sp*.4;
+    ctx.beginPath(); ctx.moveTo(0,sy+yo);
+    for(let x=0;x<=W;x+=3){
+      const y=sy+yo
+        +Math.sin(x*.014+t*.0012)*(8+sp*.3)
+        +Math.sin(x*.026+t*.0008)*(4+sp*.15)
+        +Math.sin(x*.05+t*.0016)*(2+sp*.05);
+      ctx.lineTo(x,y);
+    }
+    ctx.strokeStyle=`rgba(185,228,255,${al.toFixed(3)})`;
+    ctx.lineWidth=1.0+b*.07; ctx.stroke();
+  }
+  // Sky fill
+  ctx.beginPath(); ctx.moveTo(0,sy);
+  for(let x=0;x<=W;x+=3)
+    ctx.lineTo(x,sy+Math.sin(x*.014+t*.0012)*8+Math.sin(x*.026+t*.0008)*4);
+  ctx.lineTo(W,0); ctx.lineTo(0,0); ctx.closePath();
+  const sg=ctx.createLinearGradient(0,0,0,sy);
+  sg.addColorStop(0,'rgba(155,215,255,.08)');
+  sg.addColorStop(1,'rgba(100,180,240,.02)');
+  ctx.fillStyle=sg; ctx.fill();
+  ctx.globalAlpha=1;
+}
+
+function drawGuessWave(sy, t){
+  const {pxAmp} = guessParams();
+  if(pxAmp<1) return;
+  ctx.beginPath();
+  for(let i=0;i<=W;i+=3){
+    const py = guessCanvasY(i/W, sy);
+    i===0 ? ctx.moveTo(i,py) : ctx.lineTo(i,py);
+  }
+  ctx.strokeStyle='rgba(255,210,80,.80)';
+  ctx.lineWidth=2.2; ctx.lineJoin='round'; ctx.stroke();
+
+  // Subtle fill
+  ctx.beginPath();
+  for(let i=0;i<=W;i+=3){
+    const py=guessCanvasY(i/W,sy);
+    i===0?ctx.moveTo(i,py):ctx.lineTo(i,py);
+  }
+  ctx.lineTo(W,sy+80); ctx.lineTo(0,sy+80); ctx.closePath();
+  const gf=ctx.createLinearGradient(0,sy-40,0,sy+80);
+  gf.addColorStop(0,'rgba(255,210,80,.09)');
+  gf.addColorStop(1,'rgba(255,210,80,0)');
+  ctx.fillStyle=gf; ctx.fill();
+}
+
+function drawRealWave(sy, progress){
+  const alpha = Math.min(1, progress*1.5);
+
+  // Keep guess wave visible but faded — comparison reference
+  const guessAlpha = Math.max(0, 0.4 - progress*0.5);
+  if(guessAlpha > 0){
+    ctx.globalAlpha = guessAlpha;
+    ctx.beginPath();
+    for(let i=0;i<=W;i+=3){
+      const py=guessCanvasY(i/W,sy);
+      i===0?ctx.moveTo(i,py):ctx.lineTo(i,py);
+    }
+    ctx.strokeStyle='rgba(255,210,80,.6)';
+    ctx.lineWidth=1.5; ctx.lineJoin='round'; ctx.stroke();
+    ctx.globalAlpha=1;
+  }
+
+  // Fill beneath real wave
+  ctx.globalAlpha = alpha*0.15;
+  ctx.beginPath();
+  for(let i=0;i<=W;i+=3){
+    const py=realCanvasY(i/W,sy);
+    i===0?ctx.moveTo(i,py):ctx.lineTo(i,py);
+  }
+  ctx.lineTo(W,sy+120); ctx.lineTo(0,sy+120); ctx.closePath();
+  const gf=ctx.createLinearGradient(0,sy-80,0,sy+120);
+  gf.addColorStop(0,'rgba(120,240,200,.7)');
+  gf.addColorStop(1,'rgba(120,240,200,0)');
+  ctx.fillStyle=gf; ctx.fill();
+
+  // Real wave line — noticeably taller, asymmetric crest
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  for(let i=0;i<=W;i+=3){
+    const py=realCanvasY(i/W,sy);
+    i===0?ctx.moveTo(i,py):ctx.lineTo(i,py);
+  }
+  ctx.strokeStyle='rgba(160,255,210,.95)';
+  ctx.lineWidth=2.8; ctx.lineJoin='round'; ctx.stroke();
+  ctx.globalAlpha=1;
+}
+
+function dots(){
+  const meanY=p2y(PMEAN);
+  const gT=H*(DZB-DZH), gB=H*DZB;
+
+  // Axis label only — no title, no clutter
+  ctx.save();
+  ctx.translate(W*ML-18,(gT+gB)/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.fillStyle='rgba(255,255,255,.60)';
+  ctx.font='500 9px DM Mono,monospace'; ctx.textAlign='center';
+  ctx.fillText('p / (rho g)',0,0);
+  ctx.restore();
+
+  // Mean line
+  ctx.setLineDash([3,9]);
+  ctx.strokeStyle='rgba(255,255,255,.10)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(W*ML,meanY); ctx.lineTo(W*MR,meanY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  M.forEach((m,i)=>{
+    const dcx=mx2x(m.x), dcy=p2y(m.p), above=m.p>=PMEAN;
+
+    // Stem
+    ctx.strokeStyle='rgba(120,190,255,.18)'; ctx.lineWidth=.7;
+    ctx.beginPath(); ctx.moveTo(dcx,meanY); ctx.lineTo(dcx,dcy); ctx.stroke();
+
+    // Glow
+    const gg=ctx.createRadialGradient(dcx,dcy,0,dcx,dcy,10);
+    gg.addColorStop(0,'rgba(110,200,255,.20)');
+    gg.addColorStop(1,'rgba(110,200,255,0)');
+    ctx.fillStyle=gg; ctx.beginPath(); ctx.arc(dcx,dcy,10,0,Math.PI*2); ctx.fill();
+
+    // Dot
+    ctx.beginPath(); ctx.arc(dcx,dcy,4.5,0,Math.PI*2);
+    ctx.fillStyle=above?'rgba(135,215,255,.93)':'rgba(85,168,248,.93)';
+    ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.70)'; ctx.lineWidth=1.2; ctx.stroke();
+  });
+}
+
+function sensors(by,t){
+  const mg=W*ML, sp=W*(MR-ML);
+  for(let i=0;i<NS;i++){
+    const sx=mg+(i/(NS-1))*sp, sy2=by-2;
+    const pu=.4+.6*Math.sin(t*.002+i*.65);
+    ctx.strokeStyle='rgba(150,205,255,.40)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(sx,sy2); ctx.lineTo(sx,sy2-14); ctx.stroke();
+    ctx.fillStyle='#0d1c34';
+    ctx.strokeStyle='rgba(150,205,255,.50)'; ctx.lineWidth=.8;
+    ctx.beginPath(); ctx.roundRect(sx-5,sy2-23,10,8,1.5); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(sx,sy2-19,2,0,Math.PI*2);
+    ctx.fillStyle=`rgba(80,185,255,${pu.toFixed(2)})`; ctx.fill();
+  }
+}
+
+function fish(x,y,t,d){
+  ctx.save(); ctx.translate(x,y); ctx.scale(d,1);
+  ctx.fillStyle='rgba(80,145,210,.17)';
+  ctx.strokeStyle='rgba(130,190,240,.22)'; ctx.lineWidth=.8;
+  ctx.beginPath(); ctx.ellipse(0,0,11,4.5,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-11,0); ctx.lineTo(-17,-5); ctx.lineTo(-17,5);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function weed(x,by,t,h,col){
+  const sw=Math.sin(t*.0009+x*.08)*6;
+  ctx.strokeStyle=col; ctx.lineWidth=2; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(x,by);
+  ctx.bezierCurveTo(x+sw*.4,by-h*.35,x+sw*.9,by-h*.68,x+sw*.7,by-h);
+  ctx.stroke();
+}
+function rock(x,y,rw,rh){
+  const g=ctx.createRadialGradient(x-rw*.25,y-rh*.2,1,x,y,rw);
+  g.addColorStop(0,'#484038'); g.addColorStop(1,'#1e1c16');
+  ctx.fillStyle=g;
+  ctx.beginPath(); ctx.ellipse(x,y,rw,rh,-.15,0,Math.PI*2); ctx.fill();
+}
+function star(x,y,sz,col,t){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(Math.sin(t*.0002)*.08);
+  ctx.fillStyle=col; ctx.strokeStyle='rgba(0,0,0,.2)'; ctx.lineWidth=.5;
+  ctx.beginPath();
+  for(let i=0;i<10;i++){
+    const r=i%2===0?sz:sz*.42, a=(i*Math.PI)/5-Math.PI/2;
+    i===0?ctx.moveTo(r*Math.cos(a),r*Math.sin(a)):ctx.lineTo(r*Math.cos(a),r*Math.sin(a));
+  }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
+function loop(t){
+  rsz(); draw(t);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

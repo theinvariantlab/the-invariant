@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Wave Recovery — Argument</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: #f0ede8;
+  font-family: 'DM Sans', sans-serif;
+  width: 800px; height: 500px;
+  overflow: hidden;
+  position: relative;
+}
+canvas#wave {
+  position: absolute;
+  top: 0; left: 0;
+  width: 800px; height: 500px;
+}
+
+/* ── step boxes ── */
+.step-box {
+  position: absolute;
+  left: 40px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px 0 12px;
+  height: 42px;          /* taller than before */
+  opacity: 0;
+  transform: translateY(5px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+  white-space: nowrap;
+}
+.step-box.visible { opacity: 1; transform: translateY(0); }
+
+#box0 { top: 422px; background: rgba(65, 85, 125, 0.85); }
+#box1 { top: 350px; background: rgba(72, 98, 148, 0.82); }
+#box2 { top: 270px; background: rgba(78, 112, 168, 0.80); }
+#box3 { top: 148px; background: rgba(84, 126, 188, 0.72); }
+
+.step-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255,255,255,.95);
+  margin-right: 10px;
+  min-width: 14px;
+  flex-shrink: 0;
+}
+
+/* KaTeX inside boxes — white, slightly larger */
+.step-box .katex { font-size: 14px !important; }
+/* Color all text spans white, but do NOT touch background-color (fraction bars use it) */
+.step-box .katex .mord,
+.step-box .katex .mrel,
+.step-box .katex .mop,
+.step-box .katex .mbin,
+.step-box .katex .mopen,
+.step-box .katex .mclose,
+.step-box .katex .minner,
+.step-box .katex .mpunct,
+.step-box .katex .maccent,
+.step-box .katex .msupsub,
+.step-box .katex .mfrac,
+.step-box .katex .base,
+.step-box .katex .strut,
+.step-box .katex .sqrt,
+.step-box .katex .vlist,
+.step-box .katex .vlist-t,
+.step-box .katex .vlist-r,
+.step-box .katex .vlist-s,
+.step-box .katex .col-align-c,
+.step-box .katex span { color: rgba(255,255,255,.97) !important; border: none !important; box-shadow: none !important; }
+/* fraction bars and radical bars are <span> with background-color — must stay white */
+.step-box .katex .frac-line,
+.step-box .katex .sqrt-line,
+.step-box .katex .overline-line { background-color: rgba(255,255,255,.97) !important; }
+
+.step-desc {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: rgba(200,220,255,.72);
+  font-style: italic;
+  margin-left: 12px;
+  flex-shrink: 0;
+}
+
+/* ── formula block — boxed in sky ── */
+#formula-block {
+  position: absolute;
+  left: 380px; top: 14px;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.65s ease, transform 0.65s ease;
+  background: rgba(60,100,180,.12);
+  border: 1.5px solid rgba(80,140,220,.45);
+  border-radius: 7px;
+  padding: 10px 16px 12px 16px;
+  backdrop-filter: blur(2px);
+}
+#formula-block.visible { opacity:1; transform:translateY(0); }
+
+#formula-tag {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #6b7a96;
+  margin-bottom: 6px;
+}
+#formula-eq .katex { font-size: 15px !important; }
+#formula-eq .katex,
+#formula-eq .katex * { color: #1a2a4a !important; border: none !important; }
+</style>
+</head>
+<body>
+
+<canvas id="wave" width="800" height="500"></canvas>
+
+<!-- step boxes -->
+<div class="step-box" id="box0">
+  <span class="step-desc" style="margin-left:0;color:rgba(255,255,255,.88);font-style:normal;font-size:11.5px;letter-spacing:.03em;">sensor &nbsp; discrete pressure measurements</span>
+</div>
+<div class="step-box" id="box1">
+  <span class="step-num">①</span>
+  <span id="m1"></span>
+  <span class="step-desc">Fourier approx. from sensor data</span>
+</div>
+<!-- N annotation — appears briefly after box1 -->
+<div id="n-note" style="
+  position:absolute; left:40px; top:322px;
+  font-family:'DM Mono',monospace; font-size:10px;
+  color:rgba(255,220,80,.92); letter-spacing:.06em;
+  opacity:0; transition: opacity .5s ease;
+  pointer-events:none; white-space:nowrap;
+  text-shadow: 0 0 8px rgba(220,160,0,.5);
+">focus on this N</div>
+<div class="step-box" id="box2">
+  <span class="step-num">②</span>
+  <span id="m2"></span>
+  <span class="step-desc">holomorphic lift of p<sub style="font-size:8px">b</sub>(x)</span>
+</div>
+<div class="step-box" id="box3">
+  <span class="step-num">③</span>
+  <span id="m3"></span>
+  <span class="step-desc">holomorphic integral along γ</span>
+</div>
+
+<!-- formula block in sky -->
+<div id="formula-block">
+  <div id="formula-tag">④ wave profile</div>
+  <div id="formula-eq"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// Canvas setup
+// ═══════════════════════════════════════════════════════════
+const cv  = document.getElementById('wave');
+const ctx = cv.getContext('2d');
+const W = 800, H = 500;
+
+const SY = 0.205;   // surface mean y fraction
+const BY = 0.82;    // bed y fraction
+
+function sy() { return H * SY; }
+function by() { return H * BY; }
+
+// wave shape — same Stokes-like profile throughout
+function waveY(x) {
+  const k = 2 * Math.PI / W;
+  return sy()
+    + 22  * Math.cos(k*x + 0.3)
+    + 8   * Math.cos(2*k*x + 0.1)
+    + 3   * Math.cos(3*k*x - 0.2)
+    + 1.2 * Math.cos(4*k*x + 0.5);
+}
+function blurredY(x, t) {
+  return sy()
+    + 14 * Math.sin(x*.014 + t*.0012)
+    + 6  * Math.sin(x*.026 + t*.0008)
+    + 2  * Math.sin(x*.05  + t*.0016);
+}
+
+// ── animation state ──────────────────────────────────────
+let revealProgress  = 0;
+let revealAnimStart = null;
+let gammaAlpha      = 0;
+let gammaFading     = false;
+let nCircleAlpha    = 0;  // pencil circles around N in p_b formula
+let nCircleRects    = []; // [{cx,cy,rx,ry}] filled after KaTeX renders
+
+// canvas arrows between boxes: each has {x0,y0,x1,y1,alpha,color}
+// drawn on canvas so they can be colored and animated precisely
+const ARROWS = [
+  { id:'a01', x0:200, y0:422, x1:200, y1:392, alpha:0, col:'rgba(120,200,255,.85)' },
+  { id:'a12', x0:200, y0:350, x1:200, y1:312, alpha:0, col:'rgba(120,200,255,.85)' },
+  { id:'a23', x0:200, y0:270, x1:200, y1:190, alpha:0, col:'rgba(120,200,255,.85)' },
+];
+
+const T_REVEAL = 9200;
+const T_REVEAL_DUR = 2000;
+
+// ── seabed creatures ──────────────────────────────────────
+function weed(x, byy, t, h, col) {
+  const sw = Math.sin(t*.0009 + x*.08)*6;
+  ctx.strokeStyle=col; ctx.lineWidth=2; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(x,byy);
+  ctx.bezierCurveTo(x+sw*.4,byy-h*.35,x+sw*.9,byy-h*.68,x+sw*.7,byy-h);
+  ctx.stroke();
+}
+function rock(x,y,rw,rh){
+  const g=ctx.createRadialGradient(x-rw*.25,y-rh*.2,1,x,y,rw);
+  g.addColorStop(0,'#484038'); g.addColorStop(1,'#1e1c16');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.ellipse(x,y,rw,rh,-.15,0,Math.PI*2); ctx.fill();
+}
+function star(x,y,sz,col,t){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(Math.sin(t*.0002)*.08);
+  ctx.fillStyle=col; ctx.strokeStyle='rgba(0,0,0,.2)'; ctx.lineWidth=.5;
+  ctx.beginPath();
+  for(let i=0;i<10;i++){
+    const r=i%2===0?sz:sz*.42, a=(i*Math.PI)/5-Math.PI/2;
+    i===0?ctx.moveTo(r*Math.cos(a),r*Math.sin(a)):ctx.lineTo(r*Math.cos(a),r*Math.sin(a));
+  }
+  ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+}
+function fish(x,y,t,d){
+  ctx.save(); ctx.translate(x,y); ctx.scale(d,1);
+  ctx.fillStyle='rgba(80,145,210,.17)'; ctx.strokeStyle='rgba(130,190,240,.22)'; ctx.lineWidth=.8;
+  ctx.beginPath(); ctx.ellipse(0,0,11,4.5,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-11,0); ctx.lineTo(-17,-5); ctx.lineTo(-17,5);
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+
+// ── arrow helper ──────────────────────────────────────────
+function drawArrow(x0, y0, x1, y1, alpha, col) {
+  if (alpha <= 0) return;
+  ctx.globalAlpha = alpha;
+  // shaft
+  ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1);
+  ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.stroke();
+  // arrowhead
+  const ang = Math.atan2(y1-y0, x1-x0);
+  const hs = 8;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x1 - hs*Math.cos(ang-0.4), y1 - hs*Math.sin(ang-0.4));
+  ctx.lineTo(x1 - hs*Math.cos(ang+0.4), y1 - hs*Math.sin(ang+0.4));
+  ctx.closePath();
+  ctx.fillStyle = col; ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+// ── main draw ─────────────────────────────────────────────
+function draw(t) {
+  ctx.clearRect(0,0,W,H);
+  const surface = sy(), bed = by();
+
+  // sky
+  const skyG = ctx.createLinearGradient(0,0,0,surface);
+  skyG.addColorStop(0,'#f0ede8'); skyG.addColorStop(1,'#e8edf5');
+  ctx.fillStyle=skyG; ctx.fillRect(0,0,W,surface+30);
+
+  // ocean fill
+  const og = ctx.createLinearGradient(0,surface,0,bed);
+  og.addColorStop(0,'rgba(100,160,255,.30)');
+  og.addColorStop(0.25,'rgba(80,140,230,.50)');
+  og.addColorStop(0.7,'rgba(50,100,190,.72)');
+  og.addColorStop(1,'rgba(20,60,140,.88)');
+  ctx.beginPath(); ctx.moveTo(0,H);
+  for(let x=0;x<=W;x++) ctx.lineTo(x,waveY(x));
+  ctx.lineTo(W,H); ctx.closePath(); ctx.fillStyle=og; ctx.fill();
+
+  // caustics
+  for(let i=0;i<8;i++){
+    const rx=W*(.05+i*.13)+Math.sin(t*.0007+i*1.3)*W*.02;
+    const rg=ctx.createLinearGradient(rx,surface,rx+W*.04,bed*.5);
+    rg.addColorStop(0,'rgba(100,180,255,.20)'); rg.addColorStop(1,'rgba(80,160,230,0)');
+    ctx.beginPath(); ctx.moveTo(rx,surface);
+    ctx.lineTo(rx+W*.028,bed*.5); ctx.lineTo(rx+W*.052,bed*.5); ctx.lineTo(rx+W*.024,surface);
+    ctx.fillStyle=rg; ctx.fill();
+  }
+
+  // particles
+  const pts=[.11,.23,.31,.17,.47,.31,.64,.14,.78,.33,.89,.23,.95,.42,.21,.54,.56,.44,.79,.48];
+  for(let i=0;i<pts.length;i+=2){
+    const px=(pts[i]*W+Math.sin(t*.0004+i)*9)%W;
+    const py=surface+pts[i+1]*(bed-surface)*.82+Math.sin(t*.0006+i*2)*4;
+    ctx.beginPath(); ctx.arc(px,py,.8,0,Math.PI*2);
+    ctx.fillStyle='rgba(140,200,240,.16)'; ctx.fill();
+  }
+
+  // fish
+  fish(W*(.20+Math.sin(t*.0005)*.07), H*.35+Math.sin(t*.0009)*6, t, 1);
+  fish(W*(.73+Math.sin(t*.0003+2)*.05), H*.55+Math.sin(t*.0007)*5, t, -1);
+
+  // blurred surface
+  const blurAlpha = Math.max(0, 1 - revealProgress*3);
+  if(blurAlpha > 0){
+    ctx.globalAlpha = blurAlpha;
+    for(let b=0;b<18;b++){
+      const sp=b*1.8, al=.20*(1-b/18);
+      const yo=(b%2===0?1:-1)*sp*.4;
+      ctx.beginPath(); ctx.moveTo(0,surface+yo);
+      for(let x=0;x<=W;x+=3) ctx.lineTo(x, surface+yo+blurredY(x,t)-surface);
+      ctx.strokeStyle=`rgba(185,228,255,${al.toFixed(3)})`; ctx.lineWidth=1.0+b*.06; ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // revealed surface
+  if(revealProgress > 0){
+    const revA = Math.min(1, revealProgress*1.5);
+    ctx.beginPath(); ctx.moveTo(0,0);
+    for(let x=0;x<=W;x++) ctx.lineTo(x,waveY(x));
+    ctx.lineTo(W,0); ctx.closePath(); ctx.fillStyle='#f0ede8'; ctx.fill();
+
+    ctx.globalAlpha=revA;
+    ctx.beginPath();
+    for(let x=0;x<=W;x++) x===0?ctx.moveTo(x,waveY(x)):ctx.lineTo(x,waveY(x));
+    ctx.strokeStyle='rgba(100,200,255,.25)'; ctx.lineWidth=10; ctx.stroke();
+    ctx.beginPath();
+    for(let x=0;x<=W;x++) x===0?ctx.moveTo(x,waveY(x)):ctx.lineTo(x,waveY(x));
+    ctx.strokeStyle='rgba(135,215,255,.93)'; ctx.lineWidth=2; ctx.stroke();
+    ctx.globalAlpha=1;
+  }
+
+  // ── γ path: small green arc in the sky, left-centre, where user indicated ──
+  if(gammaAlpha > 0){
+    ctx.globalAlpha = gammaAlpha;
+    // placed in the parchment sky above the wave, roughly x=210, y=85
+    const cx0 = 210, cy0 = 85;
+    const rx = 32, ry = 11;
+
+    // glow
+    ctx.beginPath(); ctx.ellipse(cx0, cy0, rx, ry, 0, 0, Math.PI*2);
+    ctx.strokeStyle='rgba(80,255,160,.28)'; ctx.lineWidth=9; ctx.stroke();
+    // main loop
+    ctx.beginPath(); ctx.ellipse(cx0, cy0, rx, ry, 0, 0, Math.PI*2);
+    ctx.strokeStyle='rgba(80,240,140,.90)'; ctx.lineWidth=2;
+    ctx.setLineDash([]); ctx.stroke();
+
+    // arrowhead — rightward at the rightmost point
+    const aax = cx0 + rx, aay = cy0;
+    ctx.beginPath();
+    ctx.moveTo(aax, aay-6); ctx.lineTo(aax+5, aay); ctx.lineTo(aax, aay+6);
+    ctx.strokeStyle='rgba(80,240,140,.90)'; ctx.lineWidth=1.8; ctx.stroke();
+
+    // γ label above the loop
+    ctx.font='italic 600 13px "DM Mono",monospace';
+    ctx.textAlign='center';
+    ctx.fillStyle='rgba(60,180,100,.95)';
+    ctx.shadowColor='rgba(0,60,30,.4)'; ctx.shadowBlur=4;
+    ctx.fillText('γ', cx0, cy0 - ry - 6);
+    ctx.shadowBlur=0;
+
+    ctx.globalAlpha=1;
+  }
+
+  // ── pencil circles around N in p_b formula ───────────────────────
+  if (nCircleAlpha > 0 && nCircleRects.length > 0) {
+    ctx.globalAlpha = nCircleAlpha;
+    nCircleRects.forEach(({ cx, cy, rx, ry }) => {
+      // hand-drawn wobbly ellipse: draw as a series of small arcs with slight random offsets
+      ctx.beginPath();
+      const steps = 48;
+      for (let i = 0; i <= steps; i++) {
+        const angle = (i / steps) * Math.PI * 2.15; // slightly more than full circle for overlap
+        const wobble = 1 + 0.08 * Math.sin(angle * 3.7 + 0.4) + 0.05 * Math.sin(angle * 7.1);
+        const x = cx + rx * wobble * Math.cos(angle);
+        const y = cy + ry * wobble * Math.sin(angle);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      // glow
+      ctx.strokeStyle = 'rgba(255,210,60,.30)';
+      ctx.lineWidth   = 5;
+      ctx.stroke();
+      // main line
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const angle = (i / steps) * Math.PI * 2.15;
+        const wobble = 1 + 0.08 * Math.sin(angle * 3.7 + 0.4) + 0.05 * Math.sin(angle * 7.1);
+        const x = cx + rx * wobble * Math.cos(angle);
+        const y = cy + ry * wobble * Math.sin(angle);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = 'rgba(255,210,60,.90)';
+      ctx.lineWidth   = 1.6;
+      ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  // ── canvas arrows between boxes ──────────────────────────────────
+  ARROWS.forEach(a => {
+    drawArrow(a.x0, a.y0, a.x1, a.y1, a.alpha, a.col);
+  });
+  ctx.beginPath(); ctx.moveTo(0,bed);
+  for(let x=0;x<=W;x+=6) ctx.lineTo(x,bed+Math.sin(x*.04)*3.5+Math.cos(x*.025)*2);
+  ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath();
+  const bg=ctx.createLinearGradient(0,bed,0,H);
+  bg.addColorStop(0,'#1c1608'); bg.addColorStop(.4,'#241e0c'); bg.addColorStop(1,'#0d0b05');
+  ctx.fillStyle=bg; ctx.fill();
+
+  ctx.strokeStyle='rgba(120,90,40,.15)'; ctx.lineWidth=1;
+  for(let i=0;i<12;i++){
+    ctx.beginPath(); ctx.ellipse(W*(.04+i*.085),bed+9,15,2.5,0,0,Math.PI); ctx.stroke();
+  }
+  [[.04,18],[.08,13],[.27,20],[.31,14],[.60,18],[.64,13],[.88,21],[.93,14]].forEach(([f,h],i)=>
+    weed(W*f,bed+1,t+i*.6,h,i%2===0?'#15422a':'#1c3820'));
+  rock(W*.17,bed+3,20,12); rock(W*.19,bed+5,12,8);
+  rock(W*.45,bed+3,16,10);
+  rock(W*.72,bed+4,22,13); rock(W*.74,bed+6,10,7);
+  star(W*.37,bed+5,11,'#8b4010',t);
+  star(W*.83,bed+5,9,'#9a5520',t*.8+1);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Animation loop
+// ═══════════════════════════════════════════════════════════
+let startTime = null;
+
+function loop(ts){
+  if(!startTime) startTime=ts;
+  const t = ts - startTime;
+
+  if(t >= T_REVEAL){
+    if(!revealAnimStart) revealAnimStart=ts;
+    revealProgress = Math.min(1,(ts-revealAnimStart)/T_REVEAL_DUR);
+  }
+
+  if(!gammaFading)
+    gammaAlpha = Math.min(1, Math.max(0,(t-7400)/900));
+
+  draw(t);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// ═══════════════════════════════════════════════════════════
+// KaTeX rendering
+// ═══════════════════════════════════════════════════════════
+function rk(id, tex){
+  const el = document.getElementById(id);
+  if(el) katex.render(tex, el, {throwOnError:false, displayMode:false});
+}
+
+window.addEventListener('load', () => {
+  // ① p_b — sum from -N to N
+  rk('m1', 'p_b(x) = gd + \\displaystyle\\sum_{n=-N}^{N} \\hat{p}_n\\,e^{inkx}');
+
+  // collect positions of N glyphs in p_b formula for canvas circles
+  setTimeout(() => {
+    const m1el = document.getElementById('m1');
+    if (!m1el) return;
+    const allSpans = m1el.querySelectorAll('span');
+    allSpans.forEach(sp => {
+      if (sp.children.length === 0 && sp.textContent.trim() === 'N') {
+        const r = sp.getBoundingClientRect();
+        const cx = r.left + r.width  / 2;
+        const cy = r.top  + r.height / 2;
+        nCircleRects.push({ cx, cy, rx: r.width * 1.0 + 5, ry: r.height * 0.72 + 3 });
+      }
+    });
+  }, 200);
+  // ② ℬ — displaystyle frac so the bar renders
+  rk('m2', '\\mathcal{B}(z) = gd + \\displaystyle\\sum_n \\frac{\\hat{p}_n\\,e^{inkz}}{e^{nkd}}');
+  // ③ 𝒟 — integral along γ
+  rk('m3', '\\mathcal{D}(z) = \\displaystyle\\int_{\\gamma} (\\mathcal{B}(z\')-gd)\\,dz\'');
+  // ④ η formula — Im(D_s) as in thesis
+  rk('formula-eq',
+    '\\eta(x) = g^{-1}\\!\\left[B - \\sqrt{(B-ga)^2 - 2g\\,\\mathrm{Im}(\\mathcal{D}_s)}\\right]');
+
+  // make the γ subscript in 𝒟(z) green — use a short delay to let KaTeX fully paint
+  setTimeout(() => {
+    const m3el = document.getElementById('m3');
+    if (!m3el) return;
+    // KaTeX renders subscript content inside .msupsub > .vlist spans
+    // γ renders as a single-char span with class "mord mathdefault" or "mord"
+    // Walk all spans and find the one whose textContent is exactly γ
+    const allSpans = m3el.querySelectorAll('span');
+    allSpans.forEach(sp => {
+      if (sp.children.length === 0 && sp.textContent.trim() === '\u03b3') {
+        sp.style.setProperty('color', 'rgba(80,240,140,.95)', 'important');
+        sp.style.textShadow = '0 0 5px rgba(60,200,120,.55)';
+      }
+    });
+  }, 200);
+
+  runSequence();
+});
+
+// ── arrow fade helpers ────────────────────────────────────
+function fadeArrow(arr, toAlpha, dur, cb){
+  const from = arr.alpha;
+  const start = performance.now();
+  function go(ts){
+    const p = Math.min(1,(ts-start)/dur);
+    arr.alpha = from + (toAlpha-from)*p;
+    if(p<1) requestAnimationFrame(go);
+    else if(cb) cb();
+  }
+  requestAnimationFrame(go);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Sequence
+// ═══════════════════════════════════════════════════════════
+// Timeline:
+// 1000  box0 (sensor)
+// 2600  arrow0→1 fades in, then box1
+// 4600  arrow1→2 fades in, then box2
+// 6800  arrow2→3 fades in, then box3
+// 7400  γ contour begins
+// 8600  arrows all fade out
+// 9200  formula appears + surface reveal
+function runSequence(){
+  // box0
+  setTimeout(()=>{
+    document.getElementById('box0').classList.add('visible');
+  }, 1000);
+
+  // arrow0→1 then box1, then N note + circles after reader has had time to read
+  setTimeout(()=>{
+    fadeArrow(ARROWS[0], 1, 400, ()=>{
+      document.getElementById('box1').classList.add('visible');
+      setTimeout(() => {
+        document.getElementById('n-note').style.opacity = '1';
+        // fade circle in
+        const s = performance.now();
+        function fi(ts){ const p=Math.min(1,(ts-s)/500); nCircleAlpha=p; if(p<1) requestAnimationFrame(fi); }
+        requestAnimationFrame(fi);
+      }, 1800);
+    });
+  }, 2600);
+
+  // arrow1→2 then box2 — hide N note + circles
+  setTimeout(()=>{
+    document.getElementById('n-note').style.opacity = '0';
+    const s = performance.now();
+    function fo(ts){ const p=Math.min(1,(ts-s)/400); nCircleAlpha=1-p; if(p<1) requestAnimationFrame(fo); }
+    requestAnimationFrame(fo);
+    fadeArrow(ARROWS[1], 1, 400, ()=>{
+      document.getElementById('box2').classList.add('visible');
+    });
+  }, 4600);
+
+  // arrow2→3 then box3
+  setTimeout(()=>{
+    fadeArrow(ARROWS[2], 1, 400, ()=>{
+      document.getElementById('box3').classList.add('visible');
+    });
+  }, 6800);
+
+  // fade all arrows out
+  setTimeout(()=>{
+    ARROWS.forEach(a => fadeArrow(a, 0, 600));
+  }, 8600);
+
+  // formula + surface reveal; γ contour fades out
+  setTimeout(()=>{
+    document.getElementById('formula-block').classList.add('visible');
+    gammaFading = true;
+    const gs = performance.now();
+    function fg(ts){ const p=Math.min(1,(ts-gs)/3000); gammaAlpha=1-p; if(p<1) requestAnimationFrame(fg); }
+    requestAnimationFrame(fg);
+  }, 9200);
+}
+</script>
+</body>
+</html>
