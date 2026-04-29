@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Invariant · RANSAC</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  :root {
+    --bg: #F0F2F5;
+    --navy: #1C2B4A;
+    --steel: #4A6FA5;
+    --pale: #DCE8F5;
+    --muted: #6B7A96;
+    --border: #D4DCEA;
+    --red: #C94040;
+    --white: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    font-family: 'DM Sans', sans-serif;
+    color: var(--navy);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-bottom: 48px;
+  }
+
+  header {
+    width: 100%;
+    max-width: 980px;
+    padding: 24px 28px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .header-left {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .header-left span { color: var(--navy); font-weight: 500; }
+  .step-counter {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .layout {
+    width: 100%;
+    max-width: 980px;
+    padding: 20px 28px 0;
+    display: grid;
+    grid-template-columns: 1fr 210px;
+    gap: 16px;
+    align-items: start;
+  }
+
+  .left-col { display: flex; flex-direction: column; gap: 14px; }
+
+  #canvas-wrap {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+  svg#plot { display: block; width: 100%; height: 340px; }
+
+  .legend {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    background: rgba(255,255,255,0.9);
+    padding: 8px 12px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+  .leg-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+  .leg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .leg-dash { width: 22px; height: 0; border-top: 2px dashed var(--red); flex-shrink: 0; }
+  .leg-solid { width: 22px; height: 2px; background: var(--steel); flex-shrink: 0; }
+
+  .caption-panel {
+    border-left: 3px solid var(--steel);
+    padding: 14px 20px;
+    background: var(--white);
+    border-radius: 0 4px 4px 0;
+    border-top: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    min-height: 66px;
+  }
+  .cap-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--steel);
+    margin-bottom: 5px;
+  }
+  .cap-text { font-size: 14px; line-height: 1.65; color: var(--navy); font-weight: 300; }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    border: 1px solid var(--border);
+    background: var(--white);
+    color: var(--navy);
+    padding: 9px 20px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+  .btn:hover { background: var(--pale); border-color: var(--steel); }
+  .btn:disabled { opacity: 0.25; cursor: default; background: var(--white); border-color: var(--border); }
+  .btn-primary { background: var(--navy); color: var(--white); border-color: var(--navy); }
+  .btn-primary:hover { background: var(--steel); border-color: var(--steel); }
+  .btn-primary:disabled { background: var(--navy); }
+
+  .dots { display: flex; gap: 7px; align-items: center; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); transition: background 0.25s; }
+  .dot.active { background: var(--steel); }
+  .dot.done { background: var(--muted); }
+
+  /* RIGHT — tracker */
+  .right-col { display: flex; flex-direction: column; gap: 10px; }
+  .tracker-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tracker-rows { display: flex; flex-direction: column; gap: 6px; }
+
+  .tracker-row {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 9px 11px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    opacity: 0.28;
+    transition: opacity 0.35s, border-color 0.35s, background 0.35s;
+  }
+  .tracker-row.active  { opacity: 1; border-color: var(--steel); }
+  .tracker-row.done    { opacity: 0.65; }
+  .tracker-row.best    { opacity: 1; border-color: var(--steel); background: var(--pale); }
+
+  .tr-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .tr-bar-wrap { height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .tr-bar { height: 100%; border-radius: 3px; width: 0%; transition: width 0.5s ease; }
+  .tr-bottom { display: flex; justify-content: space-between; align-items: center; }
+  .tr-count { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--navy); }
+  .tr-best { font-family: 'DM Mono', monospace; font-size: 8px; color: var(--steel); letter-spacing: 0.08em; text-transform: uppercase; display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left"><span>The Invariant</span> · RANSAC</div>
+  <div class="step-counter" id="step-counter">Step 1 / 7</div>
+</header>
+
+<div class="layout">
+  <div class="left-col">
+    <div id="canvas-wrap">
+      <svg id="plot"></svg>
+      <div class="legend">
+        <div class="leg-row"><div class="leg-dot" style="background:var(--steel)"></div>inlier</div>
+        <div class="leg-row"><div class="leg-dot" style="background:var(--muted);opacity:0.45"></div>outlier</div>
+        <div class="leg-row"><div class="leg-dash"></div>true wall</div>
+        <div class="leg-row" id="leg-cand" style="display:none"><div class="leg-solid"></div>candidate</div>
+      </div>
+    </div>
+
+    <div class="caption-panel">
+      <div class="cap-label" id="cap-label">—</div>
+      <div class="cap-text" id="cap-text"></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="btn-prev" disabled>← Prev</button>
+      <div class="dots" id="dots"></div>
+      <button class="btn btn-primary" id="btn-next">Next →</button>
+    </div>
+  </div>
+
+  <div class="right-col">
+    <div class="tracker-title">Iterations</div>
+    <div class="tracker-rows" id="tracker-rows"></div>
+  </div>
+</div>
+
+<script>
+// ── Seeded RNG ────────────────────────────────────────────────────────────────
+function mkRng(seed) {
+  let s = seed;
+  return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+}
+const rng = mkRng(31);
+
+// ── Dimensions ────────────────────────────────────────────────────────────────
+const W = 740, H = 340;
+const PAD = { t: 20, r: 22, b: 32, l: 38 };
+const xs = d3.scaleLinear([0, 100], [PAD.l, W - PAD.r]);
+const ys = d3.scaleLinear([0, 100], [H - PAD.b, PAD.t]);
+
+// ── Data — room-shaped scatter ────────────────────────────────────────────────
+// True wall: y = 0.55x + 16
+const TM = 0.55, TB = 16;
+const THRESH = 7;
+const DOT_R = 3.5; // uniform radius
+
+// Room geometry: scatter along walls + floor of a rectangular room
+// Diagonal wall (the signal): bottom-left to top-right
+const inliers = [];
+for (let i = 0; i < 40; i++) {
+  const x = 5 + rng() * 90;
+  const y = TM * x + TB + (rng() - 0.5) * 8;
+  inliers.push({ x, y });
+}
+
+// Noise: mimic roomba — clusters along other surfaces (other walls/floor)
+// Left vertical wall cluster
+const leftWall = Array.from({length:12}, () => ({ x: 3 + rng()*8,  y: 15 + rng()*70 }));
+// Bottom horizontal wall cluster  
+const bottomWall = Array.from({length:12}, () => ({ x: 10 + rng()*80, y: 5 + rng()*10 }));
+// Top-right corner scatter
+const corner = Array.from({length:10}, () => ({ x: 75 + rng()*20, y: 68 + rng()*22 }));
+// Random scatter (open floor)
+const floor = Array.from({length:36}, () => ({ x: rng()*100, y: rng()*100 }));
+
+const allOutCandidates = [...leftWall, ...bottomWall, ...corner, ...floor];
+const outliers = allOutCandidates.filter(p => Math.abs(p.y - (TM*p.x+TB)) > THRESH + 2);
+
+// Pad or trim to exactly 100
+const rawAll = [
+  ...inliers.map(p => ({...p, isIn: true})),
+  ...outliers.map(p => ({...p, isIn: false}))
+];
+const TOTAL = 100;
+const ALL = rawAll.length >= TOTAL ? rawAll.slice(0, TOTAL) : [
+  ...rawAll,
+  ...Array.from({length: TOTAL - rawAll.length}, () => {
+    const x = rng()*100, y = rng()*100;
+    return { x, y, isIn: false };
+  })
+];
+
+// ── Pre-computed iterations ───────────────────────────────────────────────────
+// Iter A: diagonal, crossing some noise clusters — catches a few but not the wall
+const sA = [{x: 8, y: 76}, {x: 90, y: 22}];
+// Iter B: steep diagonal crossing noise only — should catch clearly fewer points than sA
+const sB = [{x: 5, y: 80}, {x: 95, y: 15}];
+// Iter C: nearly horizontal — catches bottom noise cluster
+const sC = [{x: 10, y: 14}, {x: 88, y: 18}];
+// Iter D: both on the true wall
+const sD = [inliers[4], inliers[20]];
+
+function lp(p1, p2) {
+  const m = (p2.y - p1.y) / (p2.x - p1.x);
+  return { m, b: p1.y - m * p1.x };
+}
+const pA=lp(sA[0],sA[1]), pB=lp(sB[0],sB[1]), pC=lp(sC[0],sC[1]), pD=lp(sD[0],sD[1]);
+
+function getIns(m, b) { return ALL.filter(p => Math.abs(p.y - (m*p.x+b)) < THRESH); }
+const iA=getIns(pA.m,pA.b), iB=getIns(pB.m,pB.b), iC=getIns(pC.m,pC.b), iD=getIns(pD.m,pD.b);
+
+const ITERS = [
+  { label:'Iter 1', count:iA.length, good:false },
+  { label:'Iter 2', count:iB.length, good:false },
+  { label:'Iter 3', count:iC.length, good:false },
+  { label:'Iter k', count:iD.length, good:true  },
+];
+
+// ── SVG ───────────────────────────────────────────────────────────────────────
+const svg = d3.select('#plot').attr('viewBox',`0 0 ${W} ${H}`).attr('preserveAspectRatio','xMidYMid meet');
+
+// Grid
+[0,20,40,60,80,100].forEach(v => {
+  svg.append('line').attr('x1',xs(v)).attr('x2',xs(v)).attr('y1',PAD.t).attr('y2',H-PAD.b).attr('stroke','#E2E7EF').attr('stroke-width',1);
+  svg.append('line').attr('x1',PAD.l).attr('x2',W-PAD.r).attr('y1',ys(v)).attr('y2',ys(v)).attr('stroke','#E2E7EF').attr('stroke-width',1);
+});
+
+// Axes
+svg.append('g').attr('transform',`translate(0,${H-PAD.b})`).call(d3.axisBottom(xs).ticks(5).tickSize(0).tickPadding(7))
+   .call(g=>g.select('.domain').attr('stroke','#D4DCEA'))
+   .call(g=>g.selectAll('text').attr('font-family','DM Mono').attr('font-size',9).attr('fill','#6B7A96'));
+svg.append('g').attr('transform',`translate(${PAD.l},0)`).call(d3.axisLeft(ys).ticks(5).tickSize(0).tickPadding(7))
+   .call(g=>g.select('.domain').attr('stroke','#D4DCEA'))
+   .call(g=>g.selectAll('text').attr('font-family','DM Mono').attr('font-size',9).attr('fill','#6B7A96'));
+
+// Layers
+const lBand=svg.append('g'), lTruth=svg.append('g'), lCand=svg.append('g');
+const lPts=svg.append('g'), lSample=svg.append('g'), lCount=svg.append('g');
+
+// True wall — always present
+lTruth.append('line')
+  .attr('x1',xs(0)).attr('y1',ys(TM*0+TB)).attr('x2',xs(100)).attr('y2',ys(TM*100+TB))
+  .attr('stroke','#C94040').attr('stroke-width',1.5).attr('stroke-dasharray','6 4').attr('opacity',0.55);
+
+// Points — uniform radius
+const circles = lPts.selectAll('circle').data(ALL).enter().append('circle')
+  .attr('cx', d => xs(d.x)).attr('cy', d => ys(d.y))
+  .attr('r', DOT_R)
+  .attr('fill','#8A9BB5').attr('opacity', 0.55);
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function ly(m, b, x) { return m*x+b; }
+
+function drawCand(m, b, color, op) {
+  lCand.selectAll('*').remove();
+  lCand.append('line')
+    .attr('x1',xs(0)).attr('y1',ys(ly(m,b,0))).attr('x2',xs(100)).attr('y2',ys(ly(m,b,100)))
+    .attr('stroke',color).attr('stroke-width',2).attr('opacity',op||0.8);
+}
+
+function drawBand(m, b, color) {
+  lBand.selectAll('*').remove();
+  const poly = [
+    [0,ly(m,b,0)+THRESH],[100,ly(m,b,100)+THRESH],
+    [100,ly(m,b,100)-THRESH],[0,ly(m,b,0)-THRESH]
+  ];
+  lBand.append('polygon')
+    .attr('points', poly.map(p=>`${xs(p[0])},${ys(p[1])}`).join(' '))
+    .attr('fill', color).attr('opacity', 0.1);
+  lBand.append('text').attr('x',xs(95)).attr('y',ys(ly(m,b,95)+THRESH)-4)
+    .attr('text-anchor','end').attr('font-family','DM Mono').attr('font-size',9)
+    .attr('fill',color).attr('opacity',0.6).text('+ ε');
+  lBand.append('text').attr('x',xs(95)).attr('y',ys(ly(m,b,95)-THRESH)+12)
+    .attr('text-anchor','end').attr('font-family','DM Mono').attr('font-size',9)
+    .attr('fill',color).attr('opacity',0.6).text('− ε');
+}
+
+function drawSample(pts) {
+  lSample.selectAll('*').remove();
+  pts.forEach(p => {
+    lSample.append('circle').attr('cx',xs(p.x)).attr('cy',ys(p.y)).attr('r',9)
+      .attr('fill','none').attr('stroke','#1C2B4A').attr('stroke-width',1.8).attr('opacity',0.6);
+    lSample.append('circle').attr('cx',xs(p.x)).attr('cy',ys(p.y)).attr('r',2.8)
+      .attr('fill','#1C2B4A').attr('opacity',0.65);
+  });
+}
+
+function colorBy(inSet) {
+  const key = new Set(inSet.map(p=>`${p.x.toFixed(3)},${p.y.toFixed(3)}`));
+  circles
+    .attr('fill', d => key.has(`${d.x.toFixed(3)},${d.y.toFixed(3)}`) ? '#4A6FA5' : '#8A9BB5')
+    .attr('opacity', d => key.has(`${d.x.toFixed(3)},${d.y.toFixed(3)}`) ? 0.9 : 0.28);
+}
+
+function resetColors() { circles.attr('fill','#8A9BB5').attr('opacity',0.55); }
+
+function showCount(n, total, good) {
+  lCount.selectAll('*').remove();
+  const col = good ? '#4A6FA5' : '#C94040';
+  lCount.append('rect').attr('x',PAD.l+6).attr('y',PAD.t+6).attr('width',134).attr('height',28)
+    .attr('fill','white').attr('stroke',col).attr('stroke-width',1.5).attr('rx',3);
+  lCount.append('text').attr('x',PAD.l+73).attr('y',PAD.t+25).attr('text-anchor','middle')
+    .attr('font-family','DM Mono').attr('font-size',12).attr('fill',col)
+    .text(`${n} / ${total} agree`);
+}
+
+function clearAll() {
+  lBand.selectAll('*').remove(); lCand.selectAll('*').remove();
+  lSample.selectAll('*').remove(); lCount.selectAll('*').remove();
+}
+
+// ── Tracker ───────────────────────────────────────────────────────────────────
+function buildTracker() {
+  const wrap = document.getElementById('tracker-rows'); wrap.innerHTML='';
+  ITERS.forEach((it,i) => {
+    wrap.innerHTML += `
+    <div class="tracker-row" id="tr${i}">
+      <div class="tr-label">${it.label}</div>
+      <div class="tr-bar-wrap"><div class="tr-bar" id="trb${i}" style="background:${it.good?'#4A6FA5':'#C94040'}"></div></div>
+      <div class="tr-bottom">
+        <div class="tr-count" id="trc${i}">—</div>
+        <div class="tr-best" id="trbt${i}">★ best</div>
+      </div>
+    </div>`;
+  });
+}
+
+// visUpTo: which iter row is currently active (-1 = none shown yet)
+// filledUpTo: which rows have their bar filled (only after ε step)
+// bestIdx: which row shows ★ best
+function setTracker(visUpTo, filledUpTo, bestIdx) {
+  ITERS.forEach((it,i) => {
+    const row=document.getElementById(`tr${i}`);
+    const bar=document.getElementById(`trb${i}`);
+    const cnt=document.getElementById(`trc${i}`);
+    const best=document.getElementById(`trbt${i}`);
+    if (i > visUpTo) {
+      row.className='tracker-row'; bar.style.width='0%'; cnt.textContent='—'; best.style.display='none';
+    } else {
+      const filled = i <= filledUpTo;
+      bar.style.width = filled ? `${(it.count/TOTAL*100).toFixed(0)}%` : '0%';
+      cnt.textContent = filled ? `${it.count} / ${TOTAL}` : '—';
+      if (i === visUpTo) { row.className='tracker-row active'; best.style.display='none'; }
+      else if (i === bestIdx) { row.className='tracker-row best'; best.style.display='block'; }
+      else { row.className='tracker-row done'; best.style.display='none'; }
+    }
+  });
+}
+
+// ── Steps ─────────────────────────────────────────────────────────────────────
+// setTracker(visUpTo, filledUpTo, bestIdx)
+const STEPS = [
+  {
+    label: 'The collected point cloud',
+    text: 'How can we recover the wall position using this collected data?',
+    tr: -1, fill: -1, best: -1,
+    go() { clearAll(); resetColors(); document.getElementById('leg-cand').style.display='none'; }
+  },
+  {
+    label: 'Iteration 1: select two points at random',
+    text: 'Draw a line through them. How many points of the cloud agree with this line?',
+    tr: 0, fill: -1, best: -1,
+    go() { clearAll(); resetColors(); drawSample(sA); drawCand(pA.m,pA.b,'#4A6FA5',0.65); document.getElementById('leg-cand').style.display='flex'; }
+  },
+  {
+    label: 'Iteration 1: points within ε',
+    text: `${iA.length} points lie within distance ε. Can we do better?`,
+    tr: 0, fill: 0, best: 0,
+    go() { clearAll(); drawSample(sA); drawCand(pA.m,pA.b,'#C94040',0.8); drawBand(pA.m,pA.b,'#C94040'); colorBy(iA); showCount(iA.length,TOTAL,false); }
+  },
+  {
+    label: 'Iteration 2: new pair',
+    text: 'Draw a line through them. How many points agree?',
+    tr: 1, fill: 0, best: 0,
+    go() { clearAll(); resetColors(); drawSample(sB); drawCand(pB.m,pB.b,'#4A6FA5',0.65); }
+  },
+  {
+    label: 'Iteration 2: points within ε',
+    text: `${iB.length} points agree. ${iB.length > iA.length ? 'Better than before. This becomes the new best.' : iB.length === iA.length ? 'Same count as before. No improvement.' : 'Fewer than iteration 1. No improvement.'}`,
+    tr: 1, fill: 1, best: iB.length >= iA.length ? 1 : 0,
+    go() { clearAll(); drawSample(sB); drawCand(pB.m,pB.b,'#C94040',0.8); drawBand(pB.m,pB.b,'#C94040'); colorBy(iB); showCount(iB.length,TOTAL,false); }
+  },
+  {
+    label: 'Iteration 3: new pair',
+    text: 'Try again with another random pair.',
+    tr: 2, fill: 1, best: iB.length >= iA.length ? 1 : 0,
+    go() { clearAll(); resetColors(); drawSample(sC); drawCand(pC.m,pC.b,'#4A6FA5',0.65); }
+  },
+  {
+    label: 'Iteration 3: points within ε',
+    text: `${iC.length} points agree. The search continues.`,
+    tr: 2, fill: 2, best: iB.length >= iA.length ? 1 : 0,
+    go() { clearAll(); drawSample(sC); drawCand(pC.m,pC.b,'#C94040',0.8); drawBand(pC.m,pC.b,'#C94040'); colorBy(iC); showCount(iC.length,TOTAL,false); }
+  },
+  {
+    label: 'Iteration k: two points near the target',
+    text: `${iD.length} points agree, far more than any previous attempt.`,
+    tr: 3, fill: 3, best: 3,
+    go() { clearAll(); resetColors(); drawSample(sD); drawCand(pD.m,pD.b,'#4A6FA5',0.95); drawBand(pD.m,pD.b,'#4A6FA5'); colorBy(iD); showCount(iD.length,TOTAL,true); }
+  },
+  {
+    label: 'Result',
+    text: 'After k iterations, we keep the best candidate, the one most points agreed on. That is the recovered wall.',
+    tr: 3, fill: 3, best: 3,
+    go() { clearAll(); drawCand(pD.m,pD.b,'#4A6FA5',1); drawBand(pD.m,pD.b,'#4A6FA5'); colorBy(iD); document.getElementById('leg-cand').style.display='none'; }
+  }
+];
+
+// ── Nav ───────────────────────────────────────────────────────────────────────
+let cur = 0;
+
+function buildDots() {
+  const w = document.getElementById('dots'); w.innerHTML='';
+  STEPS.forEach(() => { const d=document.createElement('div'); d.className='dot'; w.appendChild(d); });
+}
+function updateDots() {
+  document.querySelectorAll('.dot').forEach((d,i) => {
+    d.className = 'dot' + (i===cur?' active':i<cur?' done':'');
+  });
+}
+function go(idx) {
+  cur = idx;
+  const s = STEPS[idx];
+  document.getElementById('step-counter').textContent = `Step ${idx+1} / ${STEPS.length}`;
+  document.getElementById('cap-label').textContent = s.label;
+  document.getElementById('cap-text').textContent = s.text;
+  s.go();
+  setTracker(s.tr, s.fill, s.best);
+  document.getElementById('btn-prev').disabled = idx === 0;
+  document.getElementById('btn-next').disabled = idx === STEPS.length-1;
+  document.getElementById('btn-next').textContent = idx === STEPS.length-2 ? 'Finish →' : 'Next →';
+  updateDots();
+}
+
+document.getElementById('btn-next').addEventListener('click', () => { if(cur<STEPS.length-1) go(cur+1); });
+document.getElementById('btn-prev').addEventListener('click', () => { if(cur>0) go(cur-1); });
+
+buildDots(); buildTracker(); go(0);
+</script>
+</body>
+</html>
