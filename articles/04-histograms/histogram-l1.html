@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>L1 Error — The Invariant</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:  #1C2B4A;
+    --blue:  #4A6FA5;
+    --pale:  #DCE8F5;
+    --muted: #6B7A96;
+    --red:   #C94040;
+    --bg:    #F0F2F5;
+    --border:#D4DCEA;
+  }
+
+  body {
+    background: white;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--navy);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+
+  .wrap {
+    width: 100%;
+    max-width: 660px;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  .logo svg { display: block; }
+
+  .brand { display: flex; flex-direction: column; line-height: 1.1; }
+  .brand-the  { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.1em; }
+  .brand-name { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--navy); letter-spacing: 0.06em; }
+
+  .article-tag {
+    margin-left: auto;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+
+  .rule { width: 100%; height: 1px; background: var(--blue); margin: 10px 0 18px; opacity: 0.4; }
+
+  .title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 18px;
+    color: var(--navy);
+    margin-bottom: 4px;
+  }
+
+  .subtitle {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  /* Canvas card */
+  .canvas-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px 20px 12px;
+    margin-bottom: 14px;
+    position: relative;
+  }
+
+  .canvas-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    margin-bottom: 10px;
+  }
+
+  canvas { display: block; width: 100%; }
+
+  /* D badge */
+  .d-badge {
+    position: absolute;
+    top: 14px; right: 18px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* Error card */
+  .error-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .stat-card {
+    flex: 1;
+    background: var(--bg);
+    border-radius: 3px;
+    padding: 10px 14px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .stat-label {
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+
+  .stat-val {
+    font-size: 20px;
+    color: var(--navy);
+    font-weight: 500;
+  }
+
+  .stat-val.best { color: var(--blue); }
+  .stat-val.worse { color: var(--red); }
+
+  /* Error curve card */
+  .curve-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+
+  .d-slider-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 180px;
+  }
+
+  .ctrl-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  input[type=range] {
+    flex: 1;
+    accent-color: var(--blue);
+  }
+
+  .ctrl-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--navy);
+    font-weight: 500;
+    min-width: 24px;
+  }
+
+  .btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 6px 16px;
+    border-radius: 3px;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.82; }
+  .btn:disabled { opacity: 0.35; cursor: default; }
+
+  .btn-sweep { background: var(--blue); color: white; }
+  .btn-reset { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-draw  { background: var(--navy); color: var(--pale); }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+
+  .leg-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .leg-bar  { width: 14px; height: 10px; border-radius: 1px; background: var(--blue); opacity: 0.7; }
+  .leg-dash { width: 18px; height: 0; border-top: 2px dashed var(--red); }
+  .leg-fill { width: 14px; height: 10px; border-radius: 1px; background: var(--red); opacity: 0.25; }
+  .leg-dot-opt  { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); }
+  .leg-dot-cur  { width: 8px; height: 8px; border-radius: 50%; background: var(--navy); }
+
+  /* Back link */
+  .back {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-decoration: none;
+    letter-spacing: 0.06em;
+    margin-top: 18px;
+    display: inline-block;
+  }
+  .back:hover { color: var(--blue); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div class="logo">
+      <svg width="22" height="22" viewBox="-1.3 -1.3 2.6 2.6">
+        <circle cx="0" cy="0" r="1" fill="none" stroke="#4A6FA5" stroke-width="0.13"/>
+        <circle cx="0" cy="0" r="0.20" fill="#4A6FA5"/>
+        <circle cx="1"    cy="0"    r="0.12" fill="#4A6FA5"/>
+        <circle cx="0.707" cy="0.707"  r="0.12" fill="#4A6FA5"/>
+        <circle cx="0"    cy="1"    r="0.12" fill="#4A6FA5"/>
+        <circle cx="-0.707" cy="0.707" r="0.12" fill="#4A6FA5"/>
+        <circle cx="-1"   cy="0"    r="0.12" fill="#4A6FA5"/>
+        <circle cx="-0.707" cy="-0.707" r="0.12" fill="#4A6FA5"/>
+        <circle cx="0"    cy="-1"   r="0.12" fill="#4A6FA5"/>
+        <circle cx="0.707" cy="-0.707" r="0.12" fill="#4A6FA5"/>
+      </svg>
+    </div>
+    <div class="brand">
+      <span class="brand-the">the</span>
+      <span class="brand-name">invariant</span>
+    </div>
+    <span class="article-tag">article 04 -- histograms</span>
+  </div>
+
+  <div class="rule"></div>
+
+  <p class="title">The L1 error as D increases</p>
+  <p class="subtitle">shaded area = total disagreement between histogram and true density</p>
+
+  <div class="controls">
+    <div class="d-slider-wrap">
+      <span class="ctrl-label">D =</span>
+      <input type="range" id="dSlider" min="1" max="40" step="1" value="3">
+      <span class="ctrl-val" id="dVal">3</span>
+    </div>
+    <button class="btn btn-draw" id="drawBtn">new sample</button>
+    <button class="btn btn-sweep" id="sweepBtn">sweep D</button>
+    <button class="btn btn-reset" id="resetBtn">reset</button>
+  </div>
+
+  <div class="canvas-card">
+    <div class="canvas-label">histogram vs true density</div>
+    <span class="d-badge" id="dBadge">D = 3</span>
+    <canvas id="histCanvas" height="260"></canvas>
+    <div class="legend">
+      <div class="leg-item"><div class="leg-bar"></div>histogram</div>
+      <div class="leg-item"><div class="leg-dash"></div>true density</div>
+      <div class="leg-item"><div class="leg-fill"></div>L1 disagreement</div>
+    </div>
+  </div>
+
+  <div class="error-row">
+    <div class="stat-card">
+      <div class="stat-label">current L1 error</div>
+      <div class="stat-val" id="statCur">--</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">minimum L1 error</div>
+      <div class="stat-val best" id="statMin">--</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">ratio R</div>
+      <div class="stat-val" id="statR">--</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">optimal D</div>
+      <div class="stat-val best" id="statOptD">--</div>
+    </div>
+  </div>
+
+  <div class="canvas-card">
+    <div class="canvas-label">L1 error vs number of bins D</div>
+    <canvas id="errCanvas" height="160"></canvas>
+    <div class="legend" style="margin-top:8px;">
+      <div class="leg-item"><div class="leg-dot-opt"></div>optimal D</div>
+      <div class="leg-item"><div class="leg-dot-cur"></div>current D</div>
+    </div>
+  </div>
+
+  <a class="back" href="https://theinvariantlab.github.io/the-invariant">
+    &larr; theinvariantlab.github.io/the-invariant
+  </a>
+
+</div>
+
+<script>
+// ----------------------------------------------------------------
+// Palette
+// ----------------------------------------------------------------
+const NAVY  = '#1C2B4A';
+const BLUE  = '#4A6FA5';
+const PALE  = '#DCE8F5';
+const MUTED = '#6B7A96';
+const RED   = '#C94040';
+const BG    = '#F0F2F5';
+const BORDER= '#D4DCEA';
+
+// ----------------------------------------------------------------
+// True density: bimodal mixture on [0,1], normalised
+// ----------------------------------------------------------------
+function normalPDF(x, mu, sigma) {
+  const z = (x - mu) / sigma;
+  return Math.exp(-0.5 * z * z) / (sigma * Math.sqrt(2 * Math.PI));
+}
+
+const MU1 = 0.28, SIG1 = 0.07;
+const MU2 = 0.65, SIG2 = 0.09;
+
+// Approximate normalisation constant by Riemann sum
+let Z = 0;
+const NORM_N = 2000;
+for (let i = 0; i < NORM_N; i++) {
+  const x = (i + 0.5) / NORM_N;
+  Z += (0.5 * normalPDF(x, MU1, SIG1) + 0.5 * normalPDF(x, MU2, SIG2)) / NORM_N;
+}
+
+function truePDF(x) {
+  return (0.5 * normalPDF(x, MU1, SIG1) + 0.5 * normalPDF(x, MU2, SIG2)) / Z;
+}
+
+// ----------------------------------------------------------------
+// Sampling (Box-Muller for normals, then clip and resample)
+// ----------------------------------------------------------------
+let rngState = 2018;
+function seededRandom() {
+  rngState ^= rngState << 13;
+  rngState ^= rngState >> 17;
+  rngState ^= rngState << 5;
+  return ((rngState >>> 0) / 4294967296);
+}
+
+function sampleNormal(mu, sigma) {
+  let u, v, s;
+  do {
+    u = seededRandom() * 2 - 1;
+    v = seededRandom() * 2 - 1;
+    s = u * u + v * v;
+  } while (s >= 1 || s === 0);
+  return mu + sigma * u * Math.sqrt(-2 * Math.log(s) / s);
+}
+
+function drawSamples(n) {
+  const out = [];
+  while (out.length < n) {
+    const half = n - out.length;
+    for (let i = 0; i < half; i++) {
+      const x = Math.random() < 0.5
+        ? sampleNormal(MU1, SIG1)
+        : sampleNormal(MU2, SIG2);
+      if (x >= 0 && x <= 1) out.push(x);
+    }
+  }
+  return out.slice(0, n);
+}
+
+// ----------------------------------------------------------------
+// Histogram and L1 error
+// ----------------------------------------------------------------
+function histHeights(samples, D) {
+  const n = samples.length;
+  const counts = new Array(D).fill(0);
+  for (const x of samples) {
+    const k = Math.min(Math.floor(x * D), D - 1);
+    counts[k]++;
+  }
+  return counts.map(c => c * D / n);
+}
+
+function l1Error(heights, D, NRIEM = 600) {
+  let s = 0;
+  for (let i = 0; i < NRIEM; i++) {
+    const x = (i + 0.5) / NRIEM;
+    const k = Math.min(Math.floor(x * D), D - 1);
+    s += Math.abs(truePDF(x) - heights[k]) / NRIEM;
+  }
+  return s;
+}
+
+// ----------------------------------------------------------------
+// State
+// ----------------------------------------------------------------
+const N = 50;
+const D_MAX = 40;
+let samples = drawSamples(N);
+let errorCurve = [];
+let currentD = 3;
+let sweeping = false;
+let sweepTimer = null;
+
+function computeErrorCurve() {
+  errorCurve = [];
+  for (let D = 1; D <= D_MAX; D++) {
+    const h = histHeights(samples, D);
+    errorCurve.push(l1Error(h, D));
+  }
+}
+
+function optimalD() {
+  let best = Infinity, idx = 1;
+  errorCurve.forEach((e, i) => { if (e < best) { best = e; idx = i + 1; } });
+  return idx;
+}
+
+// ----------------------------------------------------------------
+// Drawing
+// ----------------------------------------------------------------
+const histCanvas = document.getElementById('histCanvas');
+const errCanvas  = document.getElementById('errCanvas');
+const hCtx = histCanvas.getContext('2d');
+const eCtx = errCanvas.getContext('2d');
+
+const dpr = window.devicePixelRatio || 1;
+
+function initCanvas(canvas) {
+  const cssH = parseInt(canvas.getAttribute('height'));
+  const cssW = canvas.parentElement.getBoundingClientRect().width
+               - 40; // card padding
+  canvas.style.width  = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width  = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+}
+
+function resizeCanvas(canvas) {
+  // no-op during render -- sizing is fixed at init and window resize only
+}
+
+function drawHistogram(D) {
+  const W = histCanvas.width, H = histCanvas.height;
+  hCtx.clearRect(0, 0, W, H);
+  hCtx.clearRect(0, 0, W, H);
+
+  const pad = { t: 14*dpr, r: 16*dpr, b: 36*dpr, l: 48*dpr };
+  const pw = W - pad.l - pad.r;
+  const ph = H - pad.t - pad.b;
+
+  const heights = histHeights(samples, D);
+  const maxH = Math.max(...heights, truePDF(MU1) * 1.05, truePDF(MU2) * 1.05) * 1.08;
+
+  function xToC(x) { return pad.l + x * pw; }
+  function yToC(y) { return pad.t + ph - (y / maxH) * ph; }
+
+  // Axes
+  hCtx.strokeStyle = MUTED;
+  hCtx.lineWidth = 0.8 * dpr;
+  hCtx.beginPath();
+  hCtx.moveTo(pad.l, pad.t + ph);
+  hCtx.lineTo(pad.l + pw, pad.t + ph);
+  hCtx.stroke();
+
+  // Y ticks
+  hCtx.fillStyle = MUTED;
+  hCtx.font = `${9*dpr}px DM Mono, monospace`;
+  hCtx.textAlign = 'right';
+  hCtx.textBaseline = 'middle';
+  const nTicks = 4;
+  for (let i = 0; i <= nTicks; i++) {
+    const v = (maxH * i / nTicks);
+    const cy = yToC(v);
+    hCtx.fillText(v.toFixed(1), pad.l - 5*dpr, cy);
+    hCtx.strokeStyle = '#F0F2F5';
+    hCtx.lineWidth = 0.5 * dpr;
+    hCtx.beginPath();
+    hCtx.moveTo(pad.l, cy); hCtx.lineTo(pad.l + pw, cy);
+    hCtx.stroke();
+  }
+
+  // X ticks
+  hCtx.fillStyle = MUTED;
+  hCtx.textAlign = 'center';
+  hCtx.textBaseline = 'top';
+  [0, 0.25, 0.5, 0.75, 1.0].forEach(v => {
+    const cx = xToC(v);
+    hCtx.fillText(v.toFixed(2), cx, pad.t + ph + 6*dpr);
+  });
+
+  // L1 shading
+  const NSUB = 80;
+  for (let k = 0; k < D; k++) {
+    const x0 = k / D, x1 = (k + 1) / D;
+    const h  = heights[k];
+    for (let j = 0; j < NSUB; j++) {
+      const xa = x0 + (x1 - x0) * j / NSUB;
+      const xb = x0 + (x1 - x0) * (j + 1) / NSUB;
+      const xm = (xa + xb) / 2;
+      const p  = truePDF(xm);
+      const lo = Math.min(h, p);
+      const hi = Math.max(h, p);
+      if (hi - lo < 1e-6) continue;
+      hCtx.fillStyle = RED + '44';
+      const cy_hi = yToC(hi), cy_lo = yToC(lo);
+      hCtx.fillRect(xToC(xa), cy_hi, xToC(xb) - xToC(xa), cy_lo - cy_hi);
+    }
+  }
+
+  // Histogram bars
+  for (let k = 0; k < D; k++) {
+    const x0 = k / D, x1 = (k + 1) / D;
+    const h  = heights[k];
+    const cx0 = xToC(x0), cx1 = xToC(x1);
+    const cy0 = yToC(h),  cy_base = yToC(0);
+    hCtx.fillStyle = BLUE + 'BB';
+    hCtx.fillRect(cx0, cy0, cx1 - cx0, cy_base - cy0);
+    hCtx.strokeStyle = PALE;
+    hCtx.lineWidth = 0.5 * dpr;
+    hCtx.strokeRect(cx0, cy0, cx1 - cx0, cy_base - cy0);
+  }
+
+  // True density curve
+  hCtx.strokeStyle = RED;
+  hCtx.lineWidth = 1.6 * dpr;
+  hCtx.setLineDash([5*dpr, 3*dpr]);
+  hCtx.beginPath();
+  const NL = 400;
+  for (let i = 0; i <= NL; i++) {
+    const x = i / NL;
+    const cx = xToC(x), cy = yToC(truePDF(x));
+    i === 0 ? hCtx.moveTo(cx, cy) : hCtx.lineTo(cx, cy);
+  }
+  hCtx.stroke();
+  hCtx.setLineDash([]);
+}
+
+function drawErrorCurve(D) {
+  const W = errCanvas.width, H = errCanvas.height;
+  eCtx.clearRect(0, 0, W, H);
+  eCtx.clearRect(0, 0, W, H);
+
+  if (!errorCurve.length) return;
+
+  const pad = { t: 10*dpr, r: 16*dpr, b: 32*dpr, l: 48*dpr };
+  const pw = W - pad.l - pad.r;
+  const ph = H - pad.t - pad.b;
+
+  const maxE = Math.max(...errorCurve) * 1.1;
+  const optD_idx = optimalD();
+
+  function xToC(d) { return pad.l + ((d - 1) / (D_MAX - 1)) * pw; }
+  function yToC(e) { return pad.t + ph - (e / maxE) * ph; }
+
+  // Axis
+  eCtx.strokeStyle = MUTED;
+  eCtx.lineWidth = 0.8 * dpr;
+  eCtx.beginPath();
+  eCtx.moveTo(pad.l, pad.t + ph);
+  eCtx.lineTo(pad.l + pw, pad.t + ph);
+  eCtx.stroke();
+
+  // Grid + Y ticks
+  eCtx.fillStyle = MUTED;
+  eCtx.font = `${9*dpr}px DM Mono, monospace`;
+  eCtx.textAlign = 'right';
+  eCtx.textBaseline = 'middle';
+  [0, 0.25, 0.5, 0.75, 1.0].forEach(t => {
+    const v = maxE * t;
+    const cy = yToC(v);
+    eCtx.fillText(v.toFixed(2), pad.l - 5*dpr, cy);
+    eCtx.strokeStyle = '#F0F2F5';
+    eCtx.lineWidth = 0.5 * dpr;
+    eCtx.beginPath();
+    eCtx.moveTo(pad.l, cy); eCtx.lineTo(pad.l + pw, cy);
+    eCtx.stroke();
+  });
+
+  // X ticks
+  eCtx.fillStyle = MUTED;
+  eCtx.textAlign = 'center';
+  eCtx.textBaseline = 'top';
+  [1, 10, 20, 30, 40].forEach(d => {
+    eCtx.fillText(d, xToC(d), pad.t + ph + 5*dpr);
+  });
+
+  // Error curve
+  eCtx.strokeStyle = NAVY;
+  eCtx.lineWidth = 1.4 * dpr;
+  eCtx.beginPath();
+  errorCurve.forEach((e, i) => {
+    const cx = xToC(i + 1), cy = yToC(e);
+    i === 0 ? eCtx.moveTo(cx, cy) : eCtx.lineTo(cx, cy);
+  });
+  eCtx.stroke();
+
+  // Optimal D vertical line
+  eCtx.strokeStyle = BLUE + 'AA';
+  eCtx.lineWidth = 1.2 * dpr;
+  eCtx.setLineDash([4*dpr, 3*dpr]);
+  eCtx.beginPath();
+  eCtx.moveTo(xToC(optD_idx), pad.t);
+  eCtx.lineTo(xToC(optD_idx), pad.t + ph);
+  eCtx.stroke();
+  eCtx.setLineDash([]);
+
+  // Optimal D dot
+  eCtx.fillStyle = BLUE;
+  eCtx.beginPath();
+  eCtx.arc(xToC(optD_idx), yToC(errorCurve[optD_idx - 1]), 4*dpr, 0, Math.PI * 2);
+  eCtx.fill();
+
+  // Current D dot
+  if (D >= 1 && D <= D_MAX) {
+    eCtx.fillStyle = NAVY;
+    eCtx.beginPath();
+    eCtx.arc(xToC(D), yToC(errorCurve[D - 1]), 4*dpr, 0, Math.PI * 2);
+    eCtx.fill();
+  }
+
+  // X axis label
+  eCtx.fillStyle = MUTED;
+  eCtx.font = `${9*dpr}px DM Mono, monospace`;
+  eCtx.textAlign = 'center';
+  eCtx.fillText('D (number of bins)', pad.l + pw / 2, pad.t + ph + 22*dpr);
+}
+
+// ----------------------------------------------------------------
+// Stats panel
+// ----------------------------------------------------------------
+function updateStats(D) {
+  if (!errorCurve.length) return;
+  const cur  = errorCurve[D - 1];
+  const min  = Math.min(...errorCurve);
+  const optD = optimalD();
+  const R    = cur / min;
+
+  const curEl = document.getElementById('statCur');
+  curEl.textContent = cur.toFixed(3);
+  curEl.className = 'stat-val' + (R > 1.3 ? ' worse' : '');
+
+  document.getElementById('statMin').textContent = min.toFixed(3);
+  document.getElementById('statR').textContent   = R.toFixed(3);
+  document.getElementById('statOptD').textContent = optD;
+}
+
+// ----------------------------------------------------------------
+// Render
+// ----------------------------------------------------------------
+function render(D) {
+  document.getElementById('dVal').textContent   = D;
+  document.getElementById('dBadge').textContent = `D = ${D}`;
+  drawHistogram(D);
+  drawErrorCurve(D);
+  updateStats(D);
+}
+
+function init() {
+  computeErrorCurve();
+  render(currentD);
+}
+
+// ----------------------------------------------------------------
+// Controls
+// ----------------------------------------------------------------
+const dSlider  = document.getElementById('dSlider');
+const sweepBtn = document.getElementById('sweepBtn');
+const resetBtn = document.getElementById('resetBtn');
+const drawBtn  = document.getElementById('drawBtn');
+
+dSlider.max = D_MAX;
+dSlider.value = currentD;
+
+dSlider.oninput = () => {
+  if (sweeping) stopSweep();
+  currentD = +dSlider.value;
+  render(currentD);
+};
+
+function stopSweep() {
+  clearInterval(sweepTimer);
+  sweeping = false;
+  sweepBtn.textContent = 'sweep D';
+  sweepBtn.disabled = false;
+}
+
+sweepBtn.onclick = () => {
+  if (sweeping) { stopSweep(); return; }
+  sweeping = true;
+  sweepBtn.textContent = 'stop';
+  let D = 1;
+  sweepTimer = setInterval(() => {
+    if (D > D_MAX) { stopSweep(); return; }
+    currentD = D;
+    dSlider.value = D;
+    render(D);
+    D++;
+  }, 100);
+};
+
+resetBtn.onclick = () => {
+  stopSweep();
+  currentD = 3;
+  dSlider.value = 3;
+  render(3);
+};
+
+drawBtn.onclick = () => {
+  stopSweep();
+  rngState = Math.floor(Math.random() * 0xFFFFFF) | 1;
+  samples = drawSamples(N);
+  computeErrorCurve();
+  render(currentD);
+};
+
+// ----------------------------------------------------------------
+// Resize
+// ----------------------------------------------------------------
+window.addEventListener('resize', () => {
+  initCanvas(histCanvas);
+  initCanvas(errCanvas);
+  render(currentD);
+});
+
+// ----------------------------------------------------------------
+// Boot
+// ----------------------------------------------------------------
+// Wait one frame so card widths are fully laid out before measuring
+requestAnimationFrame(() => {
+  initCanvas(histCanvas);
+  initCanvas(errCanvas);
+  init();
+});
+</script>
+</body>
+</html>
